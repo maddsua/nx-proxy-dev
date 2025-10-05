@@ -13,6 +13,7 @@ import (
 )
 
 var ErrTooManyConnections = errors.New("too many connections")
+var ErrPeerClosed = errors.New("peer closed")
 
 type PeerOptions struct {
 	ID             uuid.UUID         `json:"id"`
@@ -51,9 +52,14 @@ type Peer struct {
 	nextConnID uint64
 	connMap    map[uint64]*PeerConnection
 	mtx        sync.Mutex
+	closed     atomic.Bool
 }
 
 func (peer *Peer) Connection() (*PeerConnection, error) {
+
+	if peer.closed.Load() {
+		return nil, ErrPeerClosed
+	}
 
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
@@ -96,6 +102,10 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 }
 
 func (peer *Peer) RefreshState() {
+
+	if peer.closed.Load() {
+		return
+	}
 
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
@@ -200,6 +210,10 @@ func (peer *Peer) RefreshState() {
 }
 
 func (peer *Peer) Close() {
+
+	if !peer.closed.CompareAndSwap(false, true) {
+		return
+	}
 
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
