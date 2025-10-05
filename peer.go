@@ -21,6 +21,15 @@ type PeerOptions struct {
 	Bandwidth      PeerBandwidth     `json:"bandwidth"`
 }
 
+func (peer *PeerOptions) Fingerprint() string {
+
+	if auth := peer.PasswordAuth; auth != nil {
+		return fmt.Sprintf("%v:pass:%s:%s", peer.ID, auth.UserName, auth.Password)
+	}
+
+	return "<nil>"
+}
+
 type PeerPasswordAuth struct {
 	UserName string `json:"username"`
 	Password string `json:"password"`
@@ -42,15 +51,6 @@ type Peer struct {
 	nextConnID uint64
 	connMap    map[uint64]*PeerConnection
 	mtx        sync.Mutex
-}
-
-func (peer *Peer) Fingerprint() string {
-
-	if auth := peer.PasswordAuth; auth != nil {
-		return fmt.Sprintf("%v:pass:%s:%s", peer.ID, auth.UserName, auth.Password)
-	}
-
-	return "<nil>"
 }
 
 func (peer *Peer) Connection() (*PeerConnection, error) {
