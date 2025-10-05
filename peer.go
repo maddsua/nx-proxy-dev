@@ -216,6 +216,29 @@ func (peer *Peer) Close() {
 	}
 }
 
+func (peer *Peer) Deltas() (PeerDelta, bool) {
+
+	rx := peer.DataReceived.Swap(0)
+	tx := peer.DataSent.Swap(0)
+
+	if rx > 0 || tx > 0 {
+		return PeerDelta{
+			PeerID: peer.ID,
+
+			DataReceived: rx,
+			DataSent:     tx,
+		}, true
+	}
+
+	return PeerDelta{}, false
+}
+
+type PeerDelta struct {
+	PeerID       uuid.UUID `json:"peer_id"`
+	DataReceived uint64    `json:"data_received"`
+	DataSent     uint64    `json:"data_sent"`
+}
+
 type PeerConnection struct {
 	ID uint64
 

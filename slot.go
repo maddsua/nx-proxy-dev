@@ -2,6 +2,7 @@ package nxproxy
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 
-//	todo: implement stats export
 //	todo: implement service interface
 
 type ServiceType string
@@ -29,9 +29,56 @@ type SlotOptions struct {
 type Slot struct {
 	SlotOptions
 
+	deferredDeltas []PeerDelta
+
 	peerMap     map[uuid.UUID]*Peer
 	userNameMap map[string]*Peer
 	mtx         sync.Mutex
+}
+
+func (slot *Slot) Deltas() []SlotDelta {
+
+	slot.mtx.Lock()
+	defer slot.mtx.Unlock()
+
+	deltaList := slices.Clone(slot.deferredDeltas)
+	slot.deferredDeltas = nil
+
+	for _, peer := range slot.peerMap {
+		if delta, has := peer.Deltas(); has {
+			deltaList = append(deltaList, delta)
+		}
+	}
+
+	peerMap := map[uuid.UUID]*PeerDelta{}
+
+	for _, delta := range deltaList {
+
+		entry := peerMap[delta.PeerID]
+		if entry == nil {
+			entry = &delta
+			peerMap[delta.PeerID] = entry
+		} else {
+			entry.DataReceived += delta.DataReceived
+			entry.DataSent += delta.DataSent
+		}
+	}
+
+	var entries []SlotDelta
+	for _, val := range peerMap {
+		entries = append(entries, SlotDelta{
+			SlotID:    slot.ID,
+			PeerDelta: *val,
+		})
+	}
+
+	return entries
+}
+
+func (slot *Slot) deferPeerDelta(peer *Peer) {
+	if delta, has := peer.Deltas(); has {
+		slot.deferredDeltas = append(slot.deferredDeltas, delta)
+	}
 }
 
 func (slot *Slot) ImportPeerList(entries []PeerOptions) {
@@ -48,13 +95,12 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 			if peer.PeerOptions.Fingerprint() == entry.Fingerprint() {
 				peer.PeerOptions = entry
 				newPeerMap[peer.ID] = peer
-				delete(slot.peerMap, peer.ID)
+				delete(slot.peerMap, entry.ID)
 				continue
 			}
 
 			peer.Close()
-
-			//	todo: grab stats
+			slot.deferPeerDelta(peer)
 		}
 
 		newPeerMap[entry.ID] = &Peer{PeerOptions: entry}
@@ -71,7 +117,7 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 	for key, peer := range slot.peerMap {
 		if _, has := newPeerMap[key]; !has {
 			peer.Close()
-			//	todo: grab stats
+			slot.deferPeerDelta(peer)
 		}
 	}
 
@@ -86,7 +132,7 @@ func (slot *Slot) Close() {
 
 	for key, peer := range slot.peerMap {
 		peer.Close()
-		//	todo: grab stats
+		slot.deferPeerDelta(peer)
 		delete(slot.peerMap, key)
 	}
 }
@@ -131,4 +177,9 @@ func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {
 	}
 
 	return peer, nil
+}
+
+type SlotDelta struct {
+	SlotID uuid.UUID `json:"slot_id"`
+	PeerDelta
 }
