@@ -35,10 +35,10 @@ type PeerBandwidth struct {
 	MinTx uint32
 }
 
-func (peer *Peer) AuthKey() string {
+func (peer *Peer) Fingerprint() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
-		return fmt.Sprintf("pass:%s:%s", auth.UserName, auth.Password)
+		return fmt.Sprintf("%v:pass:%s:%s", peer.ID, auth.UserName, auth.Password)
 	}
 
 	return "<nil>"
