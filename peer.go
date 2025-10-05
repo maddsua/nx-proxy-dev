@@ -47,6 +47,10 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
 
+	if peer.connMap == nil {
+		peer.connMap = map[uint64]*PeerConnection{}
+	}
+
 	if peer.MaxConnections > 0 && len(peer.connMap) > int(peer.MaxConnections) {
 		return nil, ErrTooManyConnections
 	}
@@ -176,8 +180,8 @@ func (peer *Peer) RefreshState() {
 			extraTx = max(unusedTx / uint32(nsatTx))
 		}
 
-		conn.DataRateDown.Store(baseRx + extraRx)
-		conn.DataRateUp.Store(baseTx + extraTx)
+		conn.DataRateDown.Store(min(baseRx+extraRx, bandwidth.Rx))
+		conn.DataRateUp.Store(min(baseTx+extraTx, bandwidth.Tx))
 
 		peer.DataReceived.Add(volRx)
 		peer.DataSent.Add(volTx)
@@ -208,6 +212,7 @@ func (conn *PeerConnection) Context() context.Context {
 }
 
 func (conn *PeerConnection) Close() {
+
 	if conn.cancelFn != nil {
 		conn.cancelFn()
 	}
