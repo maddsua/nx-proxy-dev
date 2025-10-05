@@ -84,7 +84,7 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 	}
 
 	conn := PeerConnection{ID: nextID}
-	conn.wg.Add(1)
+	conn.io.Add(1)
 
 	peer.connMap[nextID] = &conn
 
@@ -100,7 +100,7 @@ func (peer *Peer) RefreshState() {
 
 		if conn.closed.Load() {
 
-			conn.wg.Wait()
+			conn.io.Wait()
 
 			//	copy data volume back to the peer
 			peer.DataReceived.Add(conn.DataReceived.Load())
@@ -195,6 +195,23 @@ func (peer *Peer) RefreshState() {
 	}
 }
 
+func (peer *Peer) Close() {
+
+	peer.mtx.Lock()
+	defer peer.mtx.Unlock()
+
+	for key, conn := range peer.connMap {
+
+		conn.Close()
+		conn.io.Wait()
+
+		peer.DataReceived.Add(conn.DataReceived.Load())
+		peer.DataSent.Add(conn.DataSent.Load())
+
+		delete(peer.connMap, key)
+	}
+}
+
 type PeerConnection struct {
 	ID uint64
 
@@ -207,8 +224,16 @@ type PeerConnection struct {
 	closed   atomic.Bool
 	ctx      context.Context
 	cancelFn context.CancelFunc
-	wg       sync.WaitGroup
+	io       sync.WaitGroup
 	updated  time.Time
+}
+
+func (conn *PeerConnection) IoAdd() {
+	conn.io.Add(1)
+}
+
+func (conn *PeerConnection) IoDone() {
+	conn.io.Done()
 }
 
 func (conn *PeerConnection) Context() context.Context {
@@ -219,12 +244,9 @@ func (conn *PeerConnection) Context() context.Context {
 }
 
 func (conn *PeerConnection) Close() {
-
-	if conn.cancelFn != nil {
-		conn.cancelFn()
-	}
-
 	if conn.closed.CompareAndSwap(false, true) {
-		conn.wg.Done()
+		if conn.cancelFn != nil {
+			conn.cancelFn()
+		}
 	}
 }
