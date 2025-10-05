@@ -14,11 +14,27 @@ import (
 
 var ErrTooManyConnections = errors.New("too many connections")
 
+type PeerOptions struct {
+	ID             uuid.UUID         `json:"id"`
+	PasswordAuth   *PeerPasswordAuth `json:"password_auth"`
+	MaxConnections uint              `json:"max_connections"`
+	Bandwidth      PeerBandwidth     `json:"bandwidth"`
+}
+
+type PeerPasswordAuth struct {
+	UserName string `json:"username"`
+	Password string `json:"password"`
+}
+
+type PeerBandwidth struct {
+	Rx    uint32 `json:"rx"`
+	Tx    uint32 `json:"tx"`
+	MinRx uint32 `json:"min_rx"`
+	MinTx uint32 `json:"min_tx"`
+}
+
 type Peer struct {
-	ID             uuid.UUID
-	PasswordAuth   *PeerPasswordAuth
-	MaxConnections uint
-	Bandwidth      PeerBandwidth
+	PeerOptions
 
 	DataReceived atomic.Uint64
 	DataSent     atomic.Uint64
@@ -28,13 +44,6 @@ type Peer struct {
 	mtx        sync.Mutex
 }
 
-type PeerBandwidth struct {
-	Rx    uint32
-	Tx    uint32
-	MinRx uint32
-	MinTx uint32
-}
-
 func (peer *Peer) Fingerprint() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
@@ -42,11 +51,6 @@ func (peer *Peer) Fingerprint() string {
 	}
 
 	return "<nil>"
-}
-
-type PeerPasswordAuth struct {
-	UserName string
-	Password string
 }
 
 func (peer *Peer) Connection() (*PeerConnection, error) {

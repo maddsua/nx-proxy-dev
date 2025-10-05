@@ -10,8 +10,10 @@ import (
 func TestPeer_ConnLimit(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID:             uuid.New(),
-		MaxConnections: 10,
+		PeerOptions: nxproxy.PeerOptions{
+			ID:             uuid.New(),
+			MaxConnections: 10,
+		},
 	}
 
 	for idx := range 20 {
@@ -28,8 +30,10 @@ func TestPeer_ConnLimit(t *testing.T) {
 func TestPeer_Bandwidth_1(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID:             uuid.New(),
-		MaxConnections: 10,
+		PeerOptions: nxproxy.PeerOptions{
+			ID:             uuid.New(),
+			MaxConnections: 10,
+		},
 	}
 
 	for range 5 {
@@ -64,13 +68,15 @@ func TestPeer_Bandwidth_1(t *testing.T) {
 func TestPeer_Bandwidth_2(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID:             uuid.New(),
-		MaxConnections: 10,
-		Bandwidth: nxproxy.PeerBandwidth{
-			Rx:    10_000,
-			Tx:    10_000,
-			MinRx: 1_000,
-			MinTx: 1_000,
+		PeerOptions: nxproxy.PeerOptions{
+			ID:             uuid.New(),
+			MaxConnections: 10,
+			Bandwidth: nxproxy.PeerBandwidth{
+				Rx:    10_000,
+				Tx:    10_000,
+				MinRx: 1_000,
+				MinTx: 1_000,
+			},
 		},
 	}
 
@@ -109,13 +115,15 @@ func TestPeer_Bandwidth_2(t *testing.T) {
 func TestPeer_Bandwidth_3(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID:             uuid.New(),
-		MaxConnections: 10,
-		Bandwidth: nxproxy.PeerBandwidth{
-			Rx:    10_000,
-			Tx:    10_000,
-			MinRx: 1_000,
-			MinTx: 1_000,
+		PeerOptions: nxproxy.PeerOptions{
+			ID:             uuid.New(),
+			MaxConnections: 10,
+			Bandwidth: nxproxy.PeerBandwidth{
+				Rx:    10_000,
+				Tx:    10_000,
+				MinRx: 1_000,
+				MinTx: 1_000,
+			},
 		},
 	}
 
