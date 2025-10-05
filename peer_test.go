@@ -10,11 +10,7 @@ import (
 func TestPeer_ConnLimit(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID: uuid.New(),
-		PasswordAuth: &nxproxy.PeerPasswordAuth{
-			UserName: "maddsua",
-			Password: "test123",
-		},
+		ID:             uuid.New(),
 		MaxConnections: 10,
 	}
 
@@ -32,11 +28,7 @@ func TestPeer_ConnLimit(t *testing.T) {
 func TestPeer_Bandwidth_1(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID: uuid.New(),
-		PasswordAuth: &nxproxy.PeerPasswordAuth{
-			UserName: "maddsua",
-			Password: "test123",
-		},
+		ID:             uuid.New(),
 		MaxConnections: 10,
 	}
 
@@ -72,17 +64,13 @@ func TestPeer_Bandwidth_1(t *testing.T) {
 func TestPeer_Bandwidth_2(t *testing.T) {
 
 	peer := nxproxy.Peer{
-		ID: uuid.New(),
-		PasswordAuth: &nxproxy.PeerPasswordAuth{
-			UserName: "maddsua",
-			Password: "test123",
-		},
+		ID:             uuid.New(),
 		MaxConnections: 10,
 		Bandwidth: nxproxy.PeerBandwidth{
 			Rx:    10_000,
 			Tx:    10_000,
-			MinRx: 5_000,
-			MinTx: 5_000,
+			MinRx: 1_000,
+			MinTx: 1_000,
 		},
 	}
 
@@ -93,8 +81,8 @@ func TestPeer_Bandwidth_2(t *testing.T) {
 			t.Errorf("unexpected err: %v", err)
 		}
 
-		conn.DataReceived.Add(1_000)
-		conn.DataSent.Add(500)
+		conn.DataReceived.Add(500)
+		conn.DataSent.Add(100)
 
 		defer conn.Close()
 	}
@@ -105,15 +93,60 @@ func TestPeer_Bandwidth_2(t *testing.T) {
 	}
 
 	conn.DataReceived.Add(2_000)
-	conn.DataSent.Add(1_000)
+	conn.DataSent.Add(1_600)
 
 	peer.RefreshState()
 
-	if val := conn.DataRateDown.Load(); val != 0 {
+	if val := conn.DataRateDown.Load(); val != 7496 {
 		t.Errorf("unexpected rx rate: %d", val)
 	}
 
-	if val := conn.DataRateUp.Load(); val != 0 {
+	if val := conn.DataRateUp.Load(); val != 9496 {
+		t.Errorf("unexpected tx rate: %d", val)
+	}
+}
+
+func TestPeer_Bandwidth_3(t *testing.T) {
+
+	peer := nxproxy.Peer{
+		ID:             uuid.New(),
+		MaxConnections: 10,
+		Bandwidth: nxproxy.PeerBandwidth{
+			Rx:    10_000,
+			Tx:    10_000,
+			MinRx: 1_000,
+			MinTx: 1_000,
+		},
+	}
+
+	for range 5 {
+
+		conn, err := peer.Connection()
+		if err != nil {
+			t.Errorf("unexpected err: %v", err)
+		}
+
+		conn.DataReceived.Add(500)
+		conn.DataSent.Add(100)
+
+		defer conn.Close()
+	}
+
+	conn, err := peer.Connection()
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+
+	conn.DataReceived.Add(500)
+	conn.DataSent.Add(100)
+
+	peer.RefreshState()
+
+	if val := conn.DataRateDown.Load(); val != 1666 {
+		t.Errorf("unexpected rx rate: %d", val)
+	}
+
+	if val := conn.DataRateUp.Load(); val != 1666 {
 		t.Errorf("unexpected tx rate: %d", val)
 	}
 }

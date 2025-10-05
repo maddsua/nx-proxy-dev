@@ -28,6 +28,13 @@ type Peer struct {
 	mtx        sync.Mutex
 }
 
+type PeerBandwidth struct {
+	Rx    uint32
+	Tx    uint32
+	MinRx uint32
+	MinTx uint32
+}
+
 func (peer *Peer) AuthKey() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
@@ -108,8 +115,8 @@ func (peer *Peer) RefreshState() {
 	//	recalculate bandwidth for each connection
 	bandwidth := peer.Bandwidth
 
-	var getBaseBandwidth = func(val uint32, minVal uint32) uint32 {
-		return max(val/uint32(len(peer.connMap)), minVal)
+	var getBaseBandwidth = func(val uint32) uint32 {
+		return val / uint32(len(peer.connMap))
 	}
 
 	var equivalentBandwidth = func(base uint32, updatedAt time.Time) uint64 {
@@ -123,20 +130,20 @@ func (peer *Peer) RefreshState() {
 		return uint64(base)
 	}
 
-	baseRx := getBaseBandwidth(bandwidth.Rx, bandwidth.MinRx)
-	baseTx := getBaseBandwidth(bandwidth.Tx, bandwidth.MinTx)
+	baseRx := getBaseBandwidth(bandwidth.Rx)
+	baseTx := getBaseBandwidth(bandwidth.Tx)
 
 	var unusedRx uint32
 	var unusedTx uint32
 
 	now := time.Now()
 
-	var getMargin = func(val uint64) uint64 {
-		return val / 10
+	var saturationThreshold = func(val uint64) uint64 {
+		return val - (val / 10)
 	}
 
-	satMarginRx := getMargin(uint64(baseRx))
-	satMarginTx := getMargin(uint64(baseTx))
+	satThresholdRx := saturationThreshold(uint64(baseRx))
+	satThresholdTx := saturationThreshold(uint64(baseTx))
 
 	var nsatRx, nsatTx int
 
@@ -149,13 +156,13 @@ func (peer *Peer) RefreshState() {
 		volRx := conn.DataReceived.Load()
 		volTx := conn.DataSent.Load()
 
-		if volRx >= satMarginRx {
+		if volRx >= satThresholdRx {
 			nsatRx++
 		} else if delta := equivRx - volRx; delta > 0 {
 			unusedRx += uint32(delta)
 		}
 
-		if volTx >= satMarginTx {
+		if volTx >= satThresholdTx {
 			nsatTx++
 		} else if delta := equivTx - volTx; delta > 0 {
 			unusedTx += uint32(delta)
@@ -172,16 +179,16 @@ func (peer *Peer) RefreshState() {
 
 		var extraRx, extraTx uint32
 
-		if nsatRx > 0 && volRx >= satMarginRx {
-			extraRx = max(unusedRx / uint32(nsatRx))
+		if nsatRx > 0 && volRx >= satThresholdRx {
+			extraRx = unusedRx / uint32(nsatRx)
 		}
 
-		if nsatTx > 0 && volTx >= satMarginTx {
-			extraTx = max(unusedTx / uint32(nsatTx))
+		if nsatTx > 0 && volTx >= satThresholdTx {
+			extraTx = unusedTx / uint32(nsatTx)
 		}
 
-		conn.DataRateDown.Store(min(baseRx+extraRx, bandwidth.Rx))
-		conn.DataRateUp.Store(min(baseTx+extraTx, bandwidth.Tx))
+		conn.DataRateDown.Store(max(baseRx+extraRx, bandwidth.MinRx))
+		conn.DataRateUp.Store(max(baseTx+extraTx, bandwidth.MinTx))
 
 		peer.DataReceived.Add(volRx)
 		peer.DataSent.Add(volTx)
@@ -220,11 +227,4 @@ func (conn *PeerConnection) Close() {
 	if conn.closed.CompareAndSwap(false, true) {
 		conn.wg.Done()
 	}
-}
-
-type PeerBandwidth struct {
-	Rx    uint32
-	Tx    uint32
-	MinRx uint32
-	MinTx uint32
 }
