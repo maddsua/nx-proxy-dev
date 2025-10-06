@@ -40,6 +40,8 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 
 	for _, entry := range entries {
 
+		//	todo: validate service options here
+
 		bindAddr, err := ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Service)
 		if err != nil {
 			slog.Error("ServiceHub: ServiceBindAddr invalid",

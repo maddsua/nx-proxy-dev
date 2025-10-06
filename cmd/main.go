@@ -1,0 +1,155 @@
+package main
+
+import (
+	"log/slog"
+	"net/url"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/google/uuid"
+	nxproxy "github.com/maddsua/nx-proxy"
+	"github.com/maddsua/nx-proxy/rest"
+	"github.com/maddsua/nx-proxy/rest/model"
+)
+
+func main() {
+
+	slog.SetLogLoggerLevel(slog.LevelDebug)
+
+	configFileEntries := LoadConfigFile()
+	if configFileEntries == nil {
+		slog.Warn("No config file found")
+	}
+
+	var client rest.Client
+
+	if val, ok := GetConfigOpt(configFileEntries, "SECRET_TOKEN"); ok {
+		token, err := nxproxy.ParseServerToken(val)
+		if err != nil {
+			slog.Error("STARTUP: Parse secret token",
+				slog.String("err", err.Error()))
+			os.Exit(1)
+		}
+		client.Token = token
+	} else {
+		slog.Warn("STARTUP: Secret token not provided")
+	}
+
+	if val, ok := GetConfigOpt(configFileEntries, "AUTH_URL"); ok {
+
+		url, err := url.Parse(val)
+		if err != nil {
+			slog.Error("STARTUP: Parse auth server url",
+				slog.String("err", err.Error()))
+			os.Exit(1)
+		}
+		client.URL = url
+
+	} else {
+		slog.Error("STARTUP: Auth server url not provided")
+		os.Exit(1)
+	}
+
+	var hub nxproxy.ServiceHub
+	var wg sync.WaitGroup
+
+	runID := uuid.New()
+	runAt := time.Now()
+	doneCh := make(chan struct{})
+
+	wg.Add(2)
+
+	go func() {
+
+		var retryQueue []nxproxy.SlotDelta
+
+		defer wg.Done()
+		defer slog.Debug("Routine: API: PostMetrics: Exited")
+
+		var doUpdate = func() {
+
+			metrics := model.Metrics{
+				Deltas: append(retryQueue, hub.Deltas()...),
+				Service: model.ServiceInfo{
+					RunID:  runID,
+					Uptime: int64(time.Since(runAt).Seconds()),
+				},
+			}
+
+			if err := client.PostMetrics(&metrics); err != nil {
+				slog.Error("API: PostMetrics",
+					slog.String("err", err.Error()))
+				retryQueue = metrics.Deltas
+				return
+			}
+
+			retryQueue = nil
+
+			slog.Debug("API: PostMetrics OK")
+		}
+
+		ticker := time.NewTicker(30 * time.Second)
+
+		for {
+			select {
+			case <-ticker.C:
+				doUpdate()
+			case <-doneCh:
+				doUpdate()
+				return
+			}
+		}
+	}()
+
+	go func() {
+
+		defer wg.Done()
+		defer slog.Debug("Routine: API: PullTable: Exited")
+
+		var pullTable = func() {
+
+			table, err := client.PullTable()
+			if err != nil {
+				slog.Error("API: PullTable",
+					slog.String("err", err.Error()))
+				return
+			}
+
+			slog.Debug("API: PullTable OK")
+
+			hub.ImportServices(table.Services)
+		}
+
+		ticker := time.NewTicker(15 * time.Second)
+
+		for {
+
+			pullTable()
+
+			select {
+			case <-ticker.C:
+				continue
+			case <-doneCh:
+				return
+			}
+		}
+	}()
+
+	exitCh := make(chan os.Signal, 1)
+	signal.Notify(exitCh, os.Interrupt, syscall.SIGTERM)
+
+	exitSignal := <-exitCh
+	slog.Warn("Received an exit signal",
+		slog.String("type", exitSignal.String()))
+
+	close(doneCh)
+	hub.CloseSlots()
+
+	slog.Debug("Routine: Waiting for all to finish")
+	wg.Wait()
+
+	slog.Warn("Service stopped. Bye-Bye...")
+}
