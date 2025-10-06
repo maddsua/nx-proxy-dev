@@ -13,6 +13,7 @@ var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 
 type SlotService interface {
+	ListenAndServe() error
 	Error() error
 	Close() error
 }

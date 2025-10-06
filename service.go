@@ -8,8 +8,6 @@ import (
 	"sync"
 )
 
-//	todo: check if "prefix" is assigned to this machine
-
 type Authenticator interface {
 	LookupWithPassword(username, password string) (*Peer, error)
 }
@@ -28,19 +26,139 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		hub.bindMap = map[string]*Slot{}
 	}
 
-	for _, service := range entries {
+	var slotServiceOk = func(slot *Slot) bool {
+		return slot.Service != nil && slot.Service.Error() == nil
+	}
 
-		bindAddr, err := ServiceBindAddr(service.Slot.BindAddr, service.Slot.Service)
+	var isSameSlotService = func(slot *Slot, opt *ServiceOptions) bool {
+		return slot.SlotOptions.Service == opt.Slot.Service
+	}
+
+	newBindMap := map[string]*Slot{}
+
+	for _, entry := range entries {
+
+		bindAddr, err := ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Service)
 		if err != nil {
 			slog.Error("ServiceHub: ServiceBindAddr invalid",
-				slog.String("val", service.Slot.BindAddr),
+				slog.String("val", entry.Slot.BindAddr),
 				slog.String("err", err.Error()))
 			continue
 		}
 
+		if slot, has := hub.bindMap[bindAddr]; has {
+
+			if isSameSlotService(slot, &entry) && slotServiceOk(slot) {
+
+				//	update options and peer list
+				slot.SlotOptions = entry.Slot
+				slot.ImportPeerList(entry.Peers)
+
+				//	remove from the old bind map
+				newBindMap[bindAddr] = slot
+				delete(hub.bindMap, bindAddr)
+
+				slog.Debug("ServiceHub: Update slot",
+					slog.String("id", slot.ID.String()),
+					slog.String("type", string(slot.SlotOptions.Service)),
+					slog.String("addr", slot.SlotOptions.BindAddr))
+
+				continue
+			}
+
+			if err := slot.Close(); err != nil {
+				slog.Error("ServiceHub: Replace slot: Close old slot",
+					slog.String("id", slot.ID.String()),
+					slog.String("err", err.Error()))
+				continue
+			}
+		}
+
+		slot := Slot{SlotOptions: entry.Slot}
+		slot.ImportPeerList(entry.Peers)
+
+		//	todo: switch to implementations
+		slot.Service = &DummyService{Addr: slot.BindAddr, Auth: &slot, DisplayType: string(entry.Slot.Service)}
+
+		if err := slot.Service.ListenAndServe(); err != nil {
+			slog.Error("ServiceHub: Create slot: Start service",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("err", err.Error()))
+			continue
+		}
+
+		if _, has := hub.bindMap[bindAddr]; has {
+			slog.Info("ServiceHub: Replace slot",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("addr", slot.SlotOptions.BindAddr))
+		} else {
+			slog.Info("ServiceHub: Create slot",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("addr", slot.SlotOptions.BindAddr))
+		}
+
+		newBindMap[bindAddr] = &slot
 	}
 
-	//	todo: import and diff
+	//	remove slot entries that weren't updated
+	for key, slot := range hub.bindMap {
+
+		if err := slot.Close(); err != nil {
+
+			if newSlot, has := newBindMap[key]; has {
+				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
+					slog.String("old_id", slot.ID.String()),
+					slog.String("new_id", newSlot.ID.String()),
+					slog.String("err", err.Error()))
+				newBindMap[key] = slot
+			} else {
+				slog.Error("ServiceHub: Slot failed to terminate; Unable to overwrite a newer slot entry",
+					slog.String("old_id", slot.ID.String()),
+					slog.String("new_id", newSlot.ID.String()),
+					slog.String("type", string(slot.SlotOptions.Service)),
+					slog.String("addr", slot.SlotOptions.BindAddr),
+					slog.String("err", err.Error()))
+				slog.Warn("ServiceHub: Possible service binding conflict")
+			}
+
+		} else {
+			slog.Info("ServiceHub: Remove outdated slot",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("addr", slot.SlotOptions.BindAddr))
+		}
+
+		delete(hub.bindMap, key)
+	}
+
+	hub.bindMap = newBindMap
+}
+
+func (hub *ServiceHub) CloseSlots() {
+
+	hub.mtx.Lock()
+	defer hub.mtx.Unlock()
+
+	for key, slot := range hub.bindMap {
+
+		if err := slot.Close(); err != nil {
+			slog.Error("ServiceHub: Slot failed to terminate",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("addr", slot.SlotOptions.BindAddr),
+				slog.String("err", err.Error()))
+		} else {
+			slog.Info("ServiceHub: Terminate slot",
+				slog.String("id", slot.ID.String()),
+				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("addr", slot.SlotOptions.BindAddr))
+		}
+
+		delete(hub.bindMap, key)
+	}
 }
 
 type ServiceOptions struct {
