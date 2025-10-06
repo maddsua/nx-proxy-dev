@@ -49,10 +49,11 @@ type Peer struct {
 	DataReceived atomic.Uint64
 	DataSent     atomic.Uint64
 
-	nextConnID uint64
-	connMap    map[uint64]*PeerConnection
-	mtx        sync.Mutex
-	closed     atomic.Bool
+	nextConnID    uint64
+	connMap       map[uint64]*PeerConnection
+	mtx           sync.Mutex
+	closed        atomic.Bool
+	refreshActive atomic.Bool
 }
 
 func (peer *Peer) Connection() (*PeerConnection, error) {
@@ -66,6 +67,10 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 
 	if peer.connMap == nil {
 		peer.connMap = map[uint64]*PeerConnection{}
+	}
+
+	if peer.refreshActive.CompareAndSwap(false, true) {
+		go peer.refreshRoutine()
 	}
 
 	if peer.MaxConnections > 0 && len(peer.connMap) > int(peer.MaxConnections) {
@@ -107,7 +112,32 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 	return &conn, nil
 }
 
-// todo: need to find a better way to trigger this
+func (peer *Peer) refreshRoutine() {
+
+	ticker := time.NewTicker(time.Second)
+
+	defer func() {
+		ticker.Stop()
+		peer.refreshActive.Store(false)
+	}()
+
+	//	should prevent early exits in some conditions
+	var lastNconn int
+
+	for peer.refreshActive.Load() {
+
+		<-ticker.C
+		peer.RefreshState()
+
+		nconn := len(peer.connMap)
+		if max(nconn, lastNconn) < 1 {
+			return
+		}
+
+		lastNconn = nconn
+	}
+}
+
 func (peer *Peer) RefreshState() {
 
 	if peer.closed.Load() {
@@ -235,6 +265,8 @@ func (peer *Peer) Close() {
 
 		delete(peer.connMap, key)
 	}
+
+	peer.refreshActive.Store(false)
 }
 
 func (peer *Peer) Deltas() (PeerDelta, bool) {
