@@ -93,7 +93,13 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 		return nil, err
 	}
 
-	conn := PeerConnection{ID: nextID}
+	bandwidth := peer.Bandwidth
+
+	conn := PeerConnection{
+		ID:           nextID,
+		DataRateDown: peerConnStartBandwidth(bandwidth.Rx, bandwidth.MinRx, len(peer.connMap)),
+		DataRateUp:   peerConnStartBandwidth(bandwidth.Tx, bandwidth.MinTx, len(peer.connMap)),
+	}
 	conn.io.Add(1)
 
 	peer.connMap[nextID] = &conn
@@ -101,6 +107,7 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 	return &conn, nil
 }
 
+// todo: need to find a better way to trigger this
 func (peer *Peer) RefreshState() {
 
 	if peer.closed.Load() {
@@ -290,4 +297,22 @@ func (conn *PeerConnection) Close() {
 			conn.cancelFn()
 		}
 	}
+}
+
+func peerConnStartBandwidth(base uint32, min uint32, nconn int) (bandwidth atomic.Uint32) {
+
+	var getDistributed = func() uint32 {
+
+		if base > 0 {
+			if nconn > 1 {
+				return base / uint32(nconn)
+			}
+		}
+
+		return 0
+	}
+
+	bandwidth.Store(max(getDistributed(), min))
+
+	return
 }
