@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"strconv"
 	"sync"
 )
@@ -13,8 +14,9 @@ type Authenticator interface {
 }
 
 type ServiceHub struct {
-	bindMap map[string]*Slot
-	mtx     sync.Mutex
+	bindMap        map[string]*Slot
+	mtx            sync.Mutex
+	deferredDeltas []SlotDelta
 }
 
 func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
@@ -72,6 +74,8 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 					slog.String("err", err.Error()))
 				continue
 			}
+
+			hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
 		}
 
 		slot := Slot{SlotOptions: entry.Slot}
@@ -131,10 +135,27 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		}
 
+		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
+
 		delete(hub.bindMap, key)
 	}
 
 	hub.bindMap = newBindMap
+}
+
+func (hub *ServiceHub) Deltas() []SlotDelta {
+
+	hub.mtx.Lock()
+	defer hub.mtx.Unlock()
+
+	entries := slices.Clone(hub.deferredDeltas)
+	hub.deferredDeltas = nil
+
+	for _, slot := range hub.bindMap {
+		entries = append(entries, slot.Deltas()...)
+	}
+
+	return entries
 }
 
 func (hub *ServiceHub) CloseSlots() {
@@ -156,6 +177,8 @@ func (hub *ServiceHub) CloseSlots() {
 				slog.String("type", string(slot.SlotOptions.Service)),
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		}
+
+		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
 
 		delete(hub.bindMap, key)
 	}
