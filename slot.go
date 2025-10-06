@@ -29,9 +29,9 @@ const (
 )
 
 type SlotOptions struct {
-	ID          uuid.UUID   `json:"id"`
-	ServiceType ServiceType `json:"service_type"`
-	BindAddr    string      `json:"bind_addr"`
+	ID       uuid.UUID   `json:"id"`
+	Service  ServiceType `json:"service"`
+	BindAddr string      `json:"bind_addr"`
 }
 
 type Slot struct {
