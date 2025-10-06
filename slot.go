@@ -134,7 +134,7 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 	slot.userNameMap = newUserNameMap
 }
 
-func (slot *Slot) Close() {
+func (slot *Slot) Close() error {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
@@ -144,6 +144,12 @@ func (slot *Slot) Close() {
 		slot.deferPeerDelta(peer)
 		delete(slot.peerMap, key)
 	}
+
+	if slot.Service == nil {
+		return nil
+	}
+
+	return slot.Service.Close()
 }
 
 func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {
