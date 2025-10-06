@@ -12,9 +12,16 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 
-//	todo: implement service interface
+type SlotService interface {
+	Error() error
+	Close() error
+}
 
 type ServiceType string
+
+func (val ServiceType) Valid() bool {
+	return val == ServiceTypeHttp || val == ServiceTypeSocks
+}
 
 const (
 	ServiceTypeSocks = "socks"
@@ -24,10 +31,12 @@ const (
 type SlotOptions struct {
 	ID          uuid.UUID   `json:"id"`
 	ServiceType ServiceType `json:"service_type"`
+	BindAddr    string      `json:"bind_addr"`
 }
 
 type Slot struct {
 	SlotOptions
+	Service SlotService
 
 	deferredDeltas []PeerDelta
 
