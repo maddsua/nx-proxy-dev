@@ -1,4 +1,4 @@
-package nxproxy
+package proxy
 
 import (
 	"errors"
@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 )
+
+//	todo: check map inits
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
@@ -176,10 +178,14 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 	slot.userNameMap = newUserNameMap
 }
 
-func (slot *Slot) Close() error {
+func (slot *Slot) Close() (err error) {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
+
+	if slot.Server != nil {
+		err = slot.Server.Close()
+	}
 
 	for key, peer := range slot.peerMap {
 		peer.Close()
@@ -187,11 +193,7 @@ func (slot *Slot) Close() error {
 		delete(slot.peerMap, key)
 	}
 
-	if slot.Server == nil {
-		return nil
-	}
-
-	return slot.Server.Close()
+	return
 }
 
 func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {

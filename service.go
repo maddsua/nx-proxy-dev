@@ -9,17 +9,14 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/maddsua/nx-proxy/proxy"
 	socksv5 "github.com/maddsua/nx-proxy/socks_v5"
 )
 
-type Authenticator interface {
-	LookupWithPassword(username, password string) (*Peer, error)
-}
-
 type ServiceHub struct {
-	bindMap        map[string]*Slot
+	bindMap        map[string]*proxy.Slot
 	mtx            sync.Mutex
-	deferredDeltas []SlotDelta
+	deferredDeltas []proxy.SlotDelta
 }
 
 func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
@@ -28,20 +25,20 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 	defer hub.mtx.Unlock()
 
 	if hub.bindMap == nil {
-		hub.bindMap = map[string]*Slot{}
+		hub.bindMap = map[string]*proxy.Slot{}
 	}
 
 	importedSlotIDSet := map[uuid.UUID]struct{}{}
 
-	var slotServiceOk = func(slot *Slot) bool {
+	var slotServiceOk = func(slot *proxy.Slot) bool {
 		return slot.Server != nil && slot.Server.Error() == nil
 	}
 
-	var isSameSlotService = func(slot *Slot, opt *ServiceOptions) bool {
+	var isSameSlotService = func(slot *proxy.Slot, opt *ServiceOptions) bool {
 		return slot.SlotOptions.Proto == opt.Slot.Proto
 	}
 
-	var slotOptsValid = func(slot *SlotOptions) error {
+	var slotOptsValid = func(slot *proxy.SlotOptions) error {
 
 		if slot.ID == uuid.Nil {
 			return fmt.Errorf("slot id is null")
@@ -60,7 +57,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		return nil
 	}
 
-	newBindMap := map[string]*Slot{}
+	newBindMap := map[string]*proxy.Slot{}
 
 	for _, entry := range entries {
 
@@ -109,11 +106,11 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 			hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
 		}
 
-		slot := Slot{SlotOptions: entry.Slot}
+		slot := proxy.Slot{SlotOptions: entry.Slot}
 		slot.ImportPeerList(entry.Peers)
 
 		switch slot.SlotOptions.Proto {
-		case ServiceTypeSocks:
+		case proxy.ServiceTypeSocks:
 			slot.Server = &socksv5.Server{Addr: bindAddr, Auth: &slot}
 		default:
 			//	todo: replace with a http impl
@@ -179,7 +176,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 	hub.bindMap = newBindMap
 }
 
-func (hub *ServiceHub) Deltas() []SlotDelta {
+func (hub *ServiceHub) Deltas() []proxy.SlotDelta {
 
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
@@ -221,11 +218,11 @@ func (hub *ServiceHub) CloseSlots() {
 }
 
 type ServiceOptions struct {
-	Slot  SlotOptions   `json:"slot"`
-	Peers []PeerOptions `json:"peers"`
+	Slot  proxy.SlotOptions   `json:"slot"`
+	Peers []proxy.PeerOptions `json:"peers"`
 }
 
-func ServiceBindAddr(addr string, service ProxyProto) (string, error) {
+func ServiceBindAddr(addr string, service proxy.ProxyProto) (string, error) {
 
 	prefix, suffix, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -243,7 +240,7 @@ func ServiceBindAddr(addr string, service ProxyProto) (string, error) {
 
 	var networkSuffix string
 	switch service {
-	case ServiceTypeHttp, ServiceTypeSocks:
+	case proxy.ServiceTypeHttp, proxy.ServiceTypeSocks:
 		networkSuffix = "/tcp"
 		//	udp support can be added here in the future
 	}

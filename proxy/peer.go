@@ -1,4 +1,4 @@
-package nxproxy
+package proxy
 
 import (
 	"context"
@@ -101,9 +101,9 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 	bandwidth := peer.Bandwidth
 
 	conn := PeerConnection{
-		ID:           nextID,
-		DataRateDown: peerConnStartBandwidth(bandwidth.Rx, bandwidth.MinRx, len(peer.connMap)),
-		DataRateUp:   peerConnStartBandwidth(bandwidth.Tx, bandwidth.MinTx, len(peer.connMap)),
+		id:      nextID,
+		bandwRx: peerConnStartBandwidth(bandwidth.Rx, bandwidth.MinRx, len(peer.connMap)),
+		bandwTx: peerConnStartBandwidth(bandwidth.Tx, bandwidth.MinTx, len(peer.connMap)),
 	}
 	conn.io.Add(1)
 
@@ -154,8 +154,8 @@ func (peer *Peer) RefreshState() {
 			conn.io.Wait()
 
 			//	copy data volume back to the peer
-			peer.DataReceived.Add(conn.DataReceived.Load())
-			peer.DataSent.Add(conn.DataSent.Load())
+			peer.DataReceived.Add(conn.bytesRx.Load())
+			peer.DataSent.Add(conn.bytesTx.Load())
 
 			//	and nuke the connection entirely
 			delete(peer.connMap, key)
@@ -204,8 +204,8 @@ func (peer *Peer) RefreshState() {
 		equivRx := equivalentBandwidth(baseRx, conn.updated)
 		equivTx := equivalentBandwidth(baseTx, conn.updated)
 
-		volRx := conn.DataReceived.Load()
-		volTx := conn.DataSent.Load()
+		volRx := conn.bytesRx.Load()
+		volTx := conn.bytesTx.Load()
 
 		if volRx >= satThresholdRx {
 			nsatRx++
@@ -225,8 +225,8 @@ func (peer *Peer) RefreshState() {
 	//	redistribute extra bandwidth and take data volume stats
 	for _, conn := range peer.connMap {
 
-		volRx := conn.DataReceived.Swap(0)
-		volTx := conn.DataSent.Swap(0)
+		volRx := conn.bytesRx.Swap(0)
+		volTx := conn.bytesTx.Swap(0)
 
 		var extraRx, extraTx uint32
 
@@ -238,8 +238,8 @@ func (peer *Peer) RefreshState() {
 			extraTx = unusedTx / uint32(nsatTx)
 		}
 
-		conn.DataRateDown.Store(max(baseRx+extraRx, bandwidth.MinRx))
-		conn.DataRateUp.Store(max(baseTx+extraTx, bandwidth.MinTx))
+		conn.bandwRx.Store(max(baseRx+extraRx, bandwidth.MinRx))
+		conn.bandwTx.Store(max(baseTx+extraTx, bandwidth.MinTx))
 
 		peer.DataReceived.Add(volRx)
 		peer.DataSent.Add(volTx)
@@ -260,8 +260,8 @@ func (peer *Peer) Close() {
 		conn.Close()
 		conn.io.Wait()
 
-		peer.DataReceived.Add(conn.DataReceived.Load())
-		peer.DataSent.Add(conn.DataSent.Load())
+		peer.DataReceived.Add(conn.bytesRx.Load())
+		peer.DataSent.Add(conn.bytesTx.Load())
 
 		delete(peer.connMap, key)
 	}
@@ -293,13 +293,13 @@ type PeerDelta struct {
 }
 
 type PeerConnection struct {
-	ID uint64
+	id uint64
 
-	DataReceived atomic.Uint64
-	DataSent     atomic.Uint64
+	bytesRx atomic.Uint64
+	bytesTx atomic.Uint64
 
-	DataRateDown atomic.Uint32
-	DataRateUp   atomic.Uint32
+	bandwRx atomic.Uint32
+	bandwTx atomic.Uint32
 
 	closed   atomic.Bool
 	ctx      context.Context
@@ -321,6 +321,28 @@ func (conn *PeerConnection) Context() context.Context {
 		return context.Background()
 	}
 	return conn.ctx
+}
+
+func (conn *PeerConnection) BandwidthRx() (int, bool) {
+	val := conn.bandwRx.Load()
+	return int(val), val > 0
+}
+
+func (conn *PeerConnection) BandwidthTx() (int, bool) {
+	val := conn.bandwTx.Load()
+	return int(val), val > 0
+}
+
+func (conn *PeerConnection) AccountRx(delta int) {
+	if delta > 0 {
+		conn.bytesRx.Add(uint64(delta))
+	}
+}
+
+func (conn *PeerConnection) AccountTx(delta int) {
+	if delta > 0 {
+		conn.bytesTx.Add(uint64(delta))
+	}
 }
 
 func (conn *PeerConnection) Close() {

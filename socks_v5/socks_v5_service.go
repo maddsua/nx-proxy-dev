@@ -1,46 +1,25 @@
 package socksv5
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+
+	"github.com/maddsua/nx-proxy/proxy"
 )
-
-//	todo: resolve the conandrum of importing interfaces
-
-type Authenticator interface {
-	LookupWithPassword(username, password string) (Peer, error)
-}
-
-type Peer interface {
-	Connection() (Connection, error)
-}
-
-type Connection interface {
-	Context() context.Context
-	IoAdd()
-	IoDone()
-	BandwidthRx() (int, bool)
-	BandwidthTx() (int, bool)
-	AccountRx(delta int)
-	AccountTx(delta int)
-	Close()
-}
 
 type Server struct {
 	Addr string
-	Auth Authenticator
+	Auth proxy.Authenticator
 
-	mtx       sync.Mutex
-	init      atomic.Bool
-	listener  net.Listener
-	ctx       context.Context
-	cancelCtx context.CancelFunc
-	err       error
+	mtx      sync.Mutex
+	active   atomic.Bool
+	listener net.Listener
+	wg       sync.WaitGroup
+	err      error
 }
 
 func (svc *Server) ListenAndServe() error {
@@ -48,20 +27,18 @@ func (svc *Server) ListenAndServe() error {
 	svc.mtx.Lock()
 	defer svc.mtx.Unlock()
 
-	if svc.init.Load() {
+	if svc.active.Load() {
 		if err := svc.Close(); err != nil {
 			return fmt.Errorf("restart: %v", err)
 		}
 	}
 
-	svc.init.Store(true)
-
-	svc.ctx, svc.cancelCtx = context.WithCancel(context.Background())
-
 	svc.listener, svc.err = net.Listen("tcp", svc.Addr)
 	if svc.err != nil {
 		return svc.err
 	}
+
+	svc.active.Store(true)
 
 	go svc.acceptConns()
 
@@ -77,19 +54,20 @@ func (svc *Server) Close() error {
 	svc.mtx.Lock()
 	defer svc.mtx.Unlock()
 
-	if !svc.init.CompareAndSwap(true, false) {
+	if !svc.active.Load() {
 		return nil
 	}
 
+	svc.active.Store(false)
 	svc.err = svc.listener.Close()
-	svc.cancelCtx()
+	svc.wg.Wait()
 
 	return svc.err
 }
 
 func (svc *Server) acceptConns() {
 
-	for svc.ctx.Err() == nil {
+	for svc.active.Load() {
 
 		next, err := svc.listener.Accept()
 		if err != nil {

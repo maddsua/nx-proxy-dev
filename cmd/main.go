@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
+	"github.com/maddsua/nx-proxy/proxy"
 	"github.com/maddsua/nx-proxy/rest"
 	"github.com/maddsua/nx-proxy/rest/model"
 )
@@ -64,7 +65,7 @@ func main() {
 
 	go func() {
 
-		var retryQueue []nxproxy.SlotDelta
+		var retryQueue []proxy.SlotDelta
 
 		defer wg.Done()
 		defer slog.Debug("Routine: API: PostMetrics: Exited")
