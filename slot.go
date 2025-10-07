@@ -2,6 +2,8 @@ package nxproxy
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -96,9 +98,46 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
 
+	importedPeerIdSet := map[uuid.UUID]struct{}{}
+	importedUsernameSet := map[string]struct{}{}
+
+	var peerOptsValid = func(peer *PeerOptions) error {
+
+		if peer.ID == uuid.Nil {
+			return fmt.Errorf("id is null")
+		}
+
+		if _, has := importedPeerIdSet[peer.ID]; has {
+			return fmt.Errorf("id not unique: %v", peer.ID)
+		} else {
+			importedPeerIdSet[peer.ID] = struct{}{}
+		}
+
+		if peer.PasswordAuth == nil {
+			return fmt.Errorf("no auth properties are set")
+		}
+
+		if _, has := importedUsernameSet[peer.PasswordAuth.UserName]; has {
+			return fmt.Errorf("password auth: user name not unique: %s", peer.PasswordAuth.UserName)
+		} else {
+			importedUsernameSet[peer.PasswordAuth.UserName] = struct{}{}
+		}
+
+		return nil
+	}
+
 	newPeerMap := map[uuid.UUID]*Peer{}
 
+	//	update peers
 	for _, entry := range entries {
+
+		if err := peerOptsValid(&entry); err != nil {
+			slog.Warn("Slot: Import peer: Entry invalid; Skipped",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("peer_id", entry.ID.String()),
+				slog.String("err", err.Error()))
+			continue
+		}
 
 		if peer, ok := slot.peerMap[entry.ID]; ok {
 
@@ -116,14 +155,7 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 		newPeerMap[entry.ID] = &Peer{PeerOptions: entry}
 	}
 
-	newUserNameMap := map[string]*Peer{}
-
-	for _, peer := range newPeerMap {
-		if auth := peer.PeerOptions.PasswordAuth; auth != nil {
-			newUserNameMap[auth.UserName] = peer
-		}
-	}
-
+	//	remove old peers
 	for key, peer := range slot.peerMap {
 		if _, has := newPeerMap[key]; !has {
 			peer.Close()
@@ -132,6 +164,15 @@ func (slot *Slot) ImportPeerList(entries []PeerOptions) {
 	}
 
 	slot.peerMap = newPeerMap
+
+	//	remap by username
+	newUserNameMap := map[string]*Peer{}
+	for _, peer := range newPeerMap {
+		if auth := peer.PeerOptions.PasswordAuth; auth != nil {
+			newUserNameMap[auth.UserName] = peer
+		}
+	}
+
 	slot.userNameMap = newUserNameMap
 }
 

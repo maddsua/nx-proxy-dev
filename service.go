@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 type Authenticator interface {
@@ -28,6 +30,8 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		hub.bindMap = map[string]*Slot{}
 	}
 
+	importedSlotIDSet := map[uuid.UUID]struct{}{}
+
 	var slotServiceOk = func(slot *Slot) bool {
 		return slot.Service != nil && slot.Service.Error() == nil
 	}
@@ -36,11 +40,35 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		return slot.SlotOptions.Service == opt.Slot.Service
 	}
 
+	var slotOptsValid = func(slot *SlotOptions) error {
+
+		if slot.ID == uuid.Nil {
+			return fmt.Errorf("slot id is null")
+		}
+
+		if _, has := importedSlotIDSet[slot.ID]; has {
+			return fmt.Errorf("slot id not unique: %v", slot.ID)
+		} else {
+			importedSlotIDSet[slot.ID] = struct{}{}
+		}
+
+		if !slot.Service.Valid() {
+			return fmt.Errorf("slot service value invalid: %v", slot.Service)
+		}
+
+		return nil
+	}
+
 	newBindMap := map[string]*Slot{}
 
 	for _, entry := range entries {
 
-		//	todo: validate service options here
+		if err := slotOptsValid(&entry.Slot); err != nil {
+			slog.Warn("Service: Import slot: Entry invalid; Skipped",
+				slog.String("slot_id", entry.Slot.ID.String()),
+				slog.String("err", err.Error()))
+			continue
+		}
 
 		bindAddr, err := ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Service)
 		if err != nil {
