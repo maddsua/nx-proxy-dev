@@ -14,15 +14,15 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 
-type SlotService interface {
+type SlotServer interface {
 	ListenAndServe() error
 	Error() error
 	Close() error
 }
 
-type ServiceType string
+type ProxyProto string
 
-func (val ServiceType) Valid() bool {
+func (val ProxyProto) Valid() bool {
 	return val == ServiceTypeHttp || val == ServiceTypeSocks
 }
 
@@ -32,14 +32,14 @@ const (
 )
 
 type SlotOptions struct {
-	ID       uuid.UUID   `json:"id"`
-	Service  ServiceType `json:"service"`
-	BindAddr string      `json:"bind_addr"`
+	ID       uuid.UUID  `json:"id"`
+	Proto    ProxyProto `json:"proto"`
+	BindAddr string     `json:"bind_addr"`
 }
 
 type Slot struct {
 	SlotOptions
-	Service SlotService
+	Server SlotServer
 
 	deferredDeltas []PeerDelta
 
@@ -187,11 +187,11 @@ func (slot *Slot) Close() error {
 		delete(slot.peerMap, key)
 	}
 
-	if slot.Service == nil {
+	if slot.Server == nil {
 		return nil
 	}
 
-	return slot.Service.Close()
+	return slot.Server.Close()
 }
 
 func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {

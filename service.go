@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	socksv5 "github.com/maddsua/nx-proxy/socks_v5"
 )
 
 type Authenticator interface {
@@ -33,11 +34,11 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 	importedSlotIDSet := map[uuid.UUID]struct{}{}
 
 	var slotServiceOk = func(slot *Slot) bool {
-		return slot.Service != nil && slot.Service.Error() == nil
+		return slot.Server != nil && slot.Server.Error() == nil
 	}
 
 	var isSameSlotService = func(slot *Slot, opt *ServiceOptions) bool {
-		return slot.SlotOptions.Service == opt.Slot.Service
+		return slot.SlotOptions.Proto == opt.Slot.Proto
 	}
 
 	var slotOptsValid = func(slot *SlotOptions) error {
@@ -52,8 +53,8 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 			importedSlotIDSet[slot.ID] = struct{}{}
 		}
 
-		if !slot.Service.Valid() {
-			return fmt.Errorf("slot service value invalid: %v", slot.Service)
+		if !slot.Proto.Valid() {
+			return fmt.Errorf("slot service value invalid: %v", slot.Proto)
 		}
 
 		return nil
@@ -70,7 +71,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 			continue
 		}
 
-		bindAddr, err := ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Service)
+		bindAddr, err := ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Proto)
 		if err != nil {
 			slog.Error("ServiceHub: ServiceBindAddr invalid",
 				slog.String("val", entry.Slot.BindAddr),
@@ -92,7 +93,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 
 				slog.Debug("ServiceHub: Update slot",
 					slog.String("id", slot.ID.String()),
-					slog.String("type", string(slot.SlotOptions.Service)),
+					slog.String("type", string(slot.SlotOptions.Proto)),
 					slog.String("addr", slot.SlotOptions.BindAddr))
 
 				continue
@@ -111,13 +112,18 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		slot := Slot{SlotOptions: entry.Slot}
 		slot.ImportPeerList(entry.Peers)
 
-		//	todo: switch to implementations
-		slot.Service = &DummyService{Addr: slot.BindAddr, Auth: &slot, DisplayType: string(entry.Slot.Service)}
+		switch slot.SlotOptions.Proto {
+		case ServiceTypeSocks:
+			slot.Server = &socksv5.Server{Addr: bindAddr, Auth: &slot}
+		default:
+			//	todo: replace with a http impl
+			slot.Server = &DummyService{Addr: slot.BindAddr, Auth: &slot, DisplayType: string(entry.Slot.Proto)}
+		}
 
-		if err := slot.Service.ListenAndServe(); err != nil {
+		if err := slot.Server.ListenAndServe(); err != nil {
 			slog.Error("ServiceHub: Create slot: Start service",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("err", err.Error()))
 			continue
 		}
@@ -125,12 +131,12 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		if _, has := hub.bindMap[bindAddr]; has {
 			slog.Info("ServiceHub: Replace slot",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		} else {
 			slog.Info("ServiceHub: Create slot",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		}
 
@@ -152,7 +158,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 				slog.Error("ServiceHub: Slot failed to terminate; Unable to overwrite a newer slot entry",
 					slog.String("old_id", slot.ID.String()),
 					slog.String("new_id", newSlot.ID.String()),
-					slog.String("type", string(slot.SlotOptions.Service)),
+					slog.String("type", string(slot.SlotOptions.Proto)),
 					slog.String("addr", slot.SlotOptions.BindAddr),
 					slog.String("err", err.Error()))
 				slog.Warn("ServiceHub: Possible service binding conflict")
@@ -161,7 +167,7 @@ func (hub *ServiceHub) ImportServices(entries []ServiceOptions) {
 		} else {
 			slog.Info("ServiceHub: Remove outdated slot",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		}
 
@@ -198,13 +204,13 @@ func (hub *ServiceHub) CloseSlots() {
 		if err := slot.Close(); err != nil {
 			slog.Error("ServiceHub: Slot failed to terminate",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("addr", slot.SlotOptions.BindAddr),
 				slog.String("err", err.Error()))
 		} else {
 			slog.Info("ServiceHub: Terminate slot",
 				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Service)),
+				slog.String("type", string(slot.SlotOptions.Proto)),
 				slog.String("addr", slot.SlotOptions.BindAddr))
 		}
 
@@ -219,7 +225,7 @@ type ServiceOptions struct {
 	Peers []PeerOptions `json:"peers"`
 }
 
-func ServiceBindAddr(addr string, service ServiceType) (string, error) {
+func ServiceBindAddr(addr string, service ProxyProto) (string, error) {
 
 	prefix, suffix, err := net.SplitHostPort(addr)
 	if err != nil {
