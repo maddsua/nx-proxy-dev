@@ -1,4 +1,4 @@
-package socksv5
+package socks5
 
 import (
 	"bytes"

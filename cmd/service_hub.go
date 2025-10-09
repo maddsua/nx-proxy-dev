@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
 
-	socksv5 "github.com/maddsua/nx-proxy/socks_v5"
+	socksv5 "github.com/maddsua/nx-proxy/socks5"
 )
 
 type ServiceHub struct {
