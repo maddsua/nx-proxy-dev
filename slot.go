@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 )
+
+//	todo: add some sort of rate limiting
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
@@ -242,8 +243,6 @@ func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {
 	if pa := peer.PasswordAuth; pa == nil {
 		return nil, ErrPasswordInvalid
 	} else if !comparePasswords([]byte(pa.Password), []byte(password)) {
-		//	a small fake delay to hinder password cracking attempts without having to use a full blown rate limiter
-		time.Sleep(5 * time.Second)
 		return nil, ErrPasswordInvalid
 	}
 
