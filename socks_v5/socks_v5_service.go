@@ -248,5 +248,16 @@ func (svc *Server) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAdd
 		return
 	}
 
-	//	todo: pipe and wait
+	if err := nxproxy.ProxyBridge(connCtl, conn, dstConn); err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Debug("SOCKSv5: Connect: Broken pipe",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("remote", remoteAddr.Host),
+			slog.String("err", err.Error()))
+	}
 }

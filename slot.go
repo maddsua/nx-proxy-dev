@@ -11,8 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-//	todo: check map inits
-
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 
