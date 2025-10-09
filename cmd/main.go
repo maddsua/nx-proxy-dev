@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
-	"github.com/maddsua/nx-proxy/proxy"
 	"github.com/maddsua/nx-proxy/rest"
 	"github.com/maddsua/nx-proxy/rest/model"
 )
@@ -54,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var hub nxproxy.ServiceHub
+	var hub ServiceHub
 	var wg sync.WaitGroup
 
 	runID := uuid.New()
@@ -65,7 +64,7 @@ func main() {
 
 	go func() {
 
-		var retryQueue []proxy.SlotDelta
+		var retryQueue []nxproxy.SlotDelta
 
 		defer wg.Done()
 		defer slog.Debug("Routine: API: PostMetrics: Exited")

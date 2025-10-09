@@ -7,13 +7,14 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
-	"github.com/maddsua/nx-proxy/proxy"
+	nxproxy "github.com/maddsua/nx-proxy"
 )
 
 type Server struct {
 	Addr string
-	Auth proxy.Authenticator
+	Auth nxproxy.PasswordAuthenticator
 
 	mtx      sync.Mutex
 	active   atomic.Bool
@@ -93,5 +94,27 @@ func (svc *Server) handleConn(conn net.Conn) {
 		}
 	}()
 
-	//	todo: implement
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	methods, err := readAuthMethods(conn)
+	if err != nil {
+		_ = reply(conn, byte(ReplyErrGeneric), nil)
+		return
+	}
+
+	var peer *nxproxy.Peer
+
+	if _, has := methods[AuthMethodPassword]; has {
+		if peer, err = connPasswordAuth(conn, svc.Auth); err != nil {
+			slog.Warn("SOCKS5: Password auth: Failed",
+				//	todo: log source and bind ips
+				slog.String("err", err.Error()))
+			return
+		}
+	} else {
+		_ = reply(conn, byte(AuthMethodUnacceptable), nil)
+		return
+	}
+
+	//	todo: implement other
 }

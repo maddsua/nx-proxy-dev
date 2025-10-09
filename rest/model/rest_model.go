@@ -3,7 +3,6 @@ package model
 import (
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
-	"github.com/maddsua/nx-proxy/proxy"
 )
 
 type ProxyTable struct {
@@ -11,8 +10,8 @@ type ProxyTable struct {
 }
 
 type Metrics struct {
-	Service ServiceInfo       `json:"service"`
-	Deltas  []proxy.SlotDelta `json:"deltas"`
+	Service ServiceInfo         `json:"service"`
+	Deltas  []nxproxy.SlotDelta `json:"deltas"`
 }
 
 type ServiceInfo struct {

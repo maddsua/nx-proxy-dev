@@ -1,27 +1,27 @@
-package proxy_test
+package nxproxy_test
 
 import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/maddsua/nx-proxy/proxy"
+	nxproxy "github.com/maddsua/nx-proxy"
 )
 
 func TestSlotPeerImport(t *testing.T) {
 
-	var slot proxy.Slot
+	var slot nxproxy.Slot
 
-	slot.ImportPeerList([]proxy.PeerOptions{
+	slot.ImportPeerList([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("b9cfd40e-255c-4101-85b9-73ab9efb509f"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "maddsua",
 				Password: "test123",
 			},
 		},
 		{
 			ID: uuid.MustParse("c0db0438-4d76-4c53-83f1-81fe053e0102"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "someoneelse",
 				Password: "88888888888",
 			},
@@ -38,17 +38,17 @@ func TestSlotPeerImport(t *testing.T) {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
 
-	slot.ImportPeerList([]proxy.PeerOptions{
+	slot.ImportPeerList([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("b9cfd40e-255c-4101-85b9-73ab9efb509f"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "maddsua",
 				Password: "test123",
 			},
 		},
 	})
 
-	if _, err := slot.LookupWithPassword("someoneelse", "88888888888"); err != proxy.ErrUserNotFound {
+	if _, err := slot.LookupWithPassword("someoneelse", "88888888888"); err != nxproxy.ErrUserNotFound {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
 
@@ -56,33 +56,33 @@ func TestSlotPeerImport(t *testing.T) {
 		t.Errorf("unexpected err: %v", err)
 	}
 
-	if _, err := ephemeralPeer.Connection(); err != proxy.ErrPeerClosed {
+	if _, err := ephemeralPeer.Connection(); err != nxproxy.ErrPeerClosed {
 		t.Errorf("unexpected absense of ErrPeerClosed")
 	}
 }
 
 func TestSlotDeltas(t *testing.T) {
 
-	var slot proxy.Slot
+	var slot nxproxy.Slot
 
-	slot.ImportPeerList([]proxy.PeerOptions{
+	slot.ImportPeerList([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("4f33d96b-3f6e-4d29-8936-0e0490c44d93"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "maddsua",
 				Password: "test123",
 			},
 		},
 		{
 			ID: uuid.MustParse("6018594e-6eee-4de8-86dc-33247142204f"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "notmaddsua",
 				Password: "00000000",
 			},
 		},
 		{
 			ID: uuid.MustParse("3e0e7056-8ded-4546-99f0-1b0c9014773d"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "someone_else",
 				Password: "123456",
 			},
@@ -104,10 +104,10 @@ func TestSlotDeltas(t *testing.T) {
 		peer.Close()
 	}
 
-	slot.ImportPeerList([]proxy.PeerOptions{
+	slot.ImportPeerList([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("4f33d96b-3f6e-4d29-8936-0e0490c44d93"),
-			PasswordAuth: &proxy.PeerPasswordAuth{
+			PasswordAuth: &nxproxy.PeerPasswordAuth{
 				UserName: "maddsua",
 				Password: "test123",
 			},

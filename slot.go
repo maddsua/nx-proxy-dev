@@ -1,4 +1,4 @@
-package proxy
+package nxproxy
 
 import (
 	"errors"
@@ -15,23 +15,6 @@ import (
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
-
-type SlotServer interface {
-	ListenAndServe() error
-	Error() error
-	Close() error
-}
-
-type ProxyProto string
-
-func (val ProxyProto) Valid() bool {
-	return val == ServiceTypeHttp || val == ServiceTypeSocks
-}
-
-const (
-	ServiceTypeSocks = "socks"
-	ServiceTypeHttp  = "http"
-)
 
 type SlotOptions struct {
 	ID       uuid.UUID  `json:"id"`

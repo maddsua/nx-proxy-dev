@@ -5,13 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 	"sync/atomic"
-
-	"github.com/maddsua/nx-proxy/proxy"
 )
 
 type DummyService struct {
 	Addr        string
-	Auth        proxy.Authenticator
+	Auth        PasswordAuthenticator
 	DisplayType string
 	closed      atomic.Bool
 	srv         http.Server

@@ -1,0 +1,155 @@
+package socksv5
+
+import (
+	"fmt"
+	"io"
+	"net"
+
+	nxproxy "github.com/maddsua/nx-proxy"
+)
+
+type AuthMethod byte
+
+// Reference: https://www.iana.org/assignments/socks-methods/socks-methods.xhtml
+const (
+	AuthMethodNone               = AuthMethod(0x00)
+	AuthMethodGSSAPI             = AuthMethod(0x01)
+	AuthMethodPassword           = AuthMethod(0x02)
+	AuthMethodChallengeHandshake = AuthMethod(0x03)
+	AuthMethodChallengeResponse  = AuthMethod(0x05)
+	AuthMethodSSL                = AuthMethod(0x06)
+	AuthMethodNDSAuth            = AuthMethod(0x07)
+	AuthMethodMultiAuthFramework = AuthMethod(0x08)
+	AuthMethodJSON               = AuthMethod(0x09)
+	AuthMethodUnacceptable       = AuthMethod(0xff)
+)
+
+func (val AuthMethod) String() string {
+	switch val {
+	case AuthMethodNone:
+		return "none"
+	case AuthMethodGSSAPI:
+		return "gssapi"
+	case AuthMethodPassword:
+		return "password"
+	case AuthMethodChallengeHandshake:
+		return "challenge_handshake"
+	case AuthMethodChallengeResponse:
+		return "challenge_response"
+	case AuthMethodSSL:
+		return "ssl"
+	case AuthMethodNDSAuth:
+		return "nds_auth"
+	case AuthMethodMultiAuthFramework:
+		return "multi_auth_framework"
+	case AuthMethodJSON:
+		return "json"
+	default:
+		return ""
+	}
+}
+
+func readAuthMethods(reader io.Reader) (map[AuthMethod]bool, error) {
+
+	header, err := nxproxy.ReadN(reader, 2)
+	if err != nil {
+		return nil, err
+	} else if header[0] != Version {
+		return nil, fmt.Errorf("unsupported protocol version: %x", header[0])
+	}
+
+	nmethods := int(header[1])
+	if nmethods == 0 {
+		return nil, fmt.Errorf("handshake suggests no auth methods")
+	}
+
+	methodBuff, err := nxproxy.ReadN(reader, nmethods)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read 'methods': %v", err)
+	}
+
+	methodMap := make(map[AuthMethod]bool)
+	for _, val := range methodBuff {
+		if method := AuthMethod(val); method.String() == "" {
+			methodMap[method] = true
+		}
+	}
+
+	return methodMap, nil
+}
+
+type PasswordAuthStatus byte
+
+const (
+	PasswordAuthVersion = byte(0x01)
+	PasswordAuthOk      = PasswordAuthStatus(0x00)
+	PasswordAuthFail    = PasswordAuthStatus(0x01)
+)
+
+type UserPassword struct {
+	User, Password string
+}
+
+// In accordance to https://datatracker.ietf.org/doc/html/rfc1929
+func connPasswordAuth(conn net.Conn, auth nxproxy.PasswordAuthenticator) (*nxproxy.Peer, error) {
+
+	var reply = func(val PasswordAuthStatus) error {
+		_, err := conn.Write([]byte{PasswordAuthVersion, byte(val)})
+		return err
+	}
+
+	var readCredentials = func() (*UserPassword, error) {
+
+		buff, err := nxproxy.ReadN(conn, 2)
+		if err != nil {
+			return nil, err
+		}
+
+		if ver := buff[0]; ver != PasswordAuthVersion {
+			return nil, fmt.Errorf("unexpected negotiation version: %v", ver)
+		}
+
+		ulen := int(buff[1])
+
+		if buff, err = nxproxy.ReadN(conn, ulen+1); err != nil {
+			return nil, err
+		}
+
+		username := buff[:len(buff)-1]
+		plen := int(buff[len(buff)-1])
+
+		password, err := nxproxy.ReadN(conn, plen)
+		if err != nil {
+			return nil, err
+		}
+
+		return &UserPassword{
+			User:     string(username),
+			Password: string(password),
+		}, nil
+	}
+
+	creds, err := readCredentials()
+	if err != nil {
+		_ = reply(PasswordAuthFail)
+		return nil, fmt.Errorf("failed to read credentials: %v", err)
+	}
+
+	//	ensure that username isn't empty
+	if creds.User == "" {
+		_ = reply(PasswordAuthFail)
+		return nil, fmt.Errorf("invalid credentials: empty user name")
+	}
+
+	peer, err := auth.LookupWithPassword(creds.User, creds.Password)
+	if err != nil {
+		_ = reply(PasswordAuthFail)
+		return nil, err
+	}
+
+	if err := reply(PasswordAuthOk); err != nil {
+		return nil, fmt.Errorf("send ack: %v", err)
+	}
+
+	return peer, nil
+}
