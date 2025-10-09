@@ -109,10 +109,26 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 
 	bandwidth := peer.Bandwidth
 
+	var baseBandwidth = func(base uint32, min uint32) (val atomic.Uint32) {
+
+		var distributed = func() uint32 {
+
+			if n := len(peer.connMap); n > 1 {
+				return base / uint32(n)
+			}
+
+			return base
+		}
+
+		val.Store(max(distributed(), min))
+
+		return
+	}
+
 	conn := PeerConnection{
 		id:      nextID,
-		bandwRx: peerConnStartBandwidth(bandwidth.Rx, bandwidth.MinRx, len(peer.connMap)),
-		bandwTx: peerConnStartBandwidth(bandwidth.Tx, bandwidth.MinTx, len(peer.connMap)),
+		bandwRx: baseBandwidth(bandwidth.Rx, bandwidth.MinRx),
+		bandwTx: baseBandwidth(bandwidth.Tx, bandwidth.MinTx),
 	}
 
 	conn.ctx, conn.cancelFn = context.WithCancel(context.Background())
@@ -175,7 +191,12 @@ func (peer *Peer) RefreshState() {
 	bandwidth := peer.Bandwidth
 
 	var getBaseBandwidth = func(val uint32) uint32 {
-		return val / uint32(len(peer.connMap))
+
+		if n := len(peer.connMap); n > 1 {
+			return val / uint32(n)
+		}
+
+		return val
 	}
 
 	var equivalentBandwidth = func(base uint32, updatedAt time.Time) uint64 {
@@ -355,22 +376,4 @@ func (conn *PeerConnection) Close() {
 	if conn.cancelFn != nil {
 		conn.cancelFn()
 	}
-}
-
-func peerConnStartBandwidth(base uint32, min uint32, nconn int) (bandwidth atomic.Uint32) {
-
-	var getDistributed = func() uint32 {
-
-		if base > 0 {
-			if nconn > 1 {
-				return base / uint32(nconn)
-			}
-		}
-
-		return 0
-	}
-
-	bandwidth.Store(max(getDistributed(), min))
-
-	return
 }
