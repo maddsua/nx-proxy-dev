@@ -112,6 +112,10 @@ func replyAuth(conn net.Conn, val AuthMethod) error {
 // In accordance to https://datatracker.ietf.org/doc/html/rfc1929
 func connPasswordAuth(conn net.Conn, auth nxproxy.PasswordAuthenticator) (*nxproxy.Peer, error) {
 
+	if err := replyAuth(conn, AuthMethodPassword); err != nil {
+		return nil, fmt.Errorf("auth method ack: %v", err)
+	}
+
 	var reply = func(val PasswordAuthStatus) error {
 		_, err := conn.Write([]byte{PasswordAuthVersion, byte(val)})
 		return err
