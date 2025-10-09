@@ -1,13 +1,12 @@
 package socksv5
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
 	"runtime/debug"
 	"strconv"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +24,9 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 		return nil, fmt.Errorf("listen: %v", err)
 	}
 
-	go svc.acceptConns()
+	svc.ctx, svc.cancelFn = context.WithCancel(context.Background())
 
-	svc.active.Store(true)
+	go svc.acceptConns()
 
 	return &svc, nil
 }
@@ -35,9 +34,9 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 type service struct {
 	slot nxproxy.Slot
 
-	active   atomic.Bool
+	ctx      context.Context
+	cancelFn context.CancelFunc
 	listener net.Listener
-	wg       sync.WaitGroup
 }
 
 func (svc *service) ID() uuid.UUID {
@@ -76,29 +75,34 @@ func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
 
 func (svc *service) Close() error {
 
-	if !svc.active.Load() {
+	if svc.ctx.Err() != nil {
 		return nil
 	}
 
-	svc.active.Store(false)
+	svc.cancelFn()
 	err := svc.listener.Close()
-	svc.wg.Wait()
 
 	return err
 }
 
 func (svc *service) acceptConns() {
 
-	for svc.active.Load() {
+	for svc.ctx.Err() == nil {
 
-		next, err := svc.listener.Accept()
-		if err != nil {
+		if next, err := svc.listener.Accept(); err != nil {
+
+			if svc.ctx.Err() != nil {
+				return
+			}
+
 			slog.Warn("SOCKS5: Accept connection",
 				slog.String("err", err.Error()))
-			continue
-		}
 
-		go svc.handleConn(next)
+			continue
+
+		} else {
+			go svc.handleConn(next)
+		}
 	}
 }
 
