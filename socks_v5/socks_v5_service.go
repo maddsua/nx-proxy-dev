@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -98,23 +99,154 @@ func (svc *Server) handleConn(conn net.Conn) {
 
 	methods, err := readAuthMethods(conn)
 	if err != nil {
-		_ = reply(conn, byte(ReplyErrGeneric), nil)
+		_ = reply(conn, ReplyErrGeneric, nil)
 		return
 	}
 
 	var peer *nxproxy.Peer
 
 	if _, has := methods[AuthMethodPassword]; has {
+
 		if peer, err = connPasswordAuth(conn, svc.Auth); err != nil {
+
+			client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+			host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
 			slog.Warn("SOCKS5: Password auth: Failed",
-				//	todo: log source and bind ips
+				slog.String("client_ip", client_ip.String()),
+				slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 				slog.String("err", err.Error()))
 			return
 		}
+
 	} else {
-		_ = reply(conn, byte(AuthMethodUnacceptable), nil)
+		_ = replyAuth(conn, AuthMethodUnacceptable)
 		return
 	}
 
-	//	todo: implement other
+	req, err := readRequest(conn)
+	if err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Warn("SOCKS5: Invalid request",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("err", err.Error()))
+
+		_ = reply(conn, ReplyErrGeneric, nil)
+
+		return
+	}
+
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Warn("SOCKS5: Reset io timeouts",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("err", err.Error()))
+
+		_ = reply(conn, ReplyErrGeneric, nil)
+
+		return
+	}
+
+	if nxproxy.IsLocalAddress(req.Addr.Host) {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Warn("SOCKS5: Dest addr not allowed",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("dst", req.Addr.String()))
+
+		_ = reply(conn, ReplyErrConnNotAllowedByRuleset, nil)
+	}
+
+	switch req.Cmd {
+	case CmdConnect:
+		svc.handleCmdConnect(conn, peer, req.Addr)
+	default:
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Debug("SOCKS5: Command not supported",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("cmd", req.Cmd.String()))
+
+		_ = reply(conn, ReplyErrCmdNotSupported, nil)
+	}
+}
+
+func (svc *Server) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
+
+	connCtl, err := peer.Connection()
+	if err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Debug("SOCKS5: Connect: Peer connection rejected",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("err", err.Error()))
+
+		if err == nxproxy.ErrTooManyConnections {
+			_ = reply(conn, ReplyErrConnNotAllowedByRuleset, remoteAddr)
+		} else {
+			_ = reply(conn, ReplyErrGeneric, remoteAddr)
+		}
+
+		return
+	}
+
+	defer connCtl.Close()
+
+	//	todo: insert framed ip and dns
+	dialer := nxproxy.NewTcpDialer(nil, nil)
+
+	dstConn, err := dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
+	if err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Debug("SOCKSv5: Connect: Unable to dial destination",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("remote", remoteAddr.Host),
+			slog.String("err", err.Error()))
+
+		_ = reply(conn, ReplyErrHostUnreachable, remoteAddr)
+
+		return
+	}
+
+	defer dstConn.Close()
+
+	if err := reply(conn, ReplyOk, remoteAddr); err != nil {
+
+		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
+		slog.Debug("SOCKSv5: Connect: Ack failed",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("remote", remoteAddr.Host),
+			slog.String("err", err.Error()))
+
+		return
+	}
+
+	//	todo: pipe and wait
 }

@@ -31,6 +31,15 @@ func (peer *PeerOptions) Fingerprint() string {
 	return "<nil>"
 }
 
+func (peer *PeerOptions) DisplayName() string {
+
+	if auth := peer.PasswordAuth; auth != nil {
+		return auth.UserName
+	}
+
+	return peer.ID.String()
+}
+
 type PeerPasswordAuth struct {
 	UserName string `json:"username"`
 	Password string `json:"password"`
@@ -105,7 +114,8 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 		bandwRx: peerConnStartBandwidth(bandwidth.Rx, bandwidth.MinRx, len(peer.connMap)),
 		bandwTx: peerConnStartBandwidth(bandwidth.Tx, bandwidth.MinTx, len(peer.connMap)),
 	}
-	conn.io.Add(1)
+
+	conn.ctx, conn.cancelFn = context.WithCancel(context.Background())
 
 	peer.connMap[nextID] = &conn
 
@@ -149,9 +159,7 @@ func (peer *Peer) RefreshState() {
 
 	for key, conn := range peer.connMap {
 
-		if conn.closed.Load() {
-
-			conn.io.Wait()
+		if conn.ctx.Err() != nil {
 
 			//	copy data volume back to the peer
 			peer.DataReceived.Add(conn.bytesRx.Load())
@@ -258,7 +266,6 @@ func (peer *Peer) Close() {
 	for key, conn := range peer.connMap {
 
 		conn.Close()
-		conn.io.Wait()
 
 		peer.DataReceived.Add(conn.bytesRx.Load())
 		peer.DataSent.Add(conn.bytesTx.Load())
@@ -301,24 +308,19 @@ type PeerConnection struct {
 	bandwRx atomic.Uint32
 	bandwTx atomic.Uint32
 
-	closed   atomic.Bool
+	mtx      sync.Mutex
 	ctx      context.Context
 	cancelFn context.CancelFunc
-	io       sync.WaitGroup
 	updated  time.Time
 }
 
-func (conn *PeerConnection) IoAdd() {
-	conn.io.Add(1)
-}
-
-func (conn *PeerConnection) IoDone() {
-	conn.io.Done()
-}
-
 func (conn *PeerConnection) Context() context.Context {
+
+	conn.mtx.Lock()
+	defer conn.mtx.Unlock()
+
 	if conn.ctx == nil {
-		return context.Background()
+		conn.ctx, conn.cancelFn = context.WithCancel(context.Background())
 	}
 	return conn.ctx
 }
@@ -346,10 +348,12 @@ func (conn *PeerConnection) AccountTx(delta int) {
 }
 
 func (conn *PeerConnection) Close() {
-	if conn.closed.CompareAndSwap(false, true) {
-		if conn.cancelFn != nil {
-			conn.cancelFn()
-		}
+
+	conn.mtx.Lock()
+	defer conn.mtx.Unlock()
+
+	if conn.cancelFn != nil {
+		conn.cancelFn()
 	}
 }
 

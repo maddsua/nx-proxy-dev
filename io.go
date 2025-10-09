@@ -1,14 +1,13 @@
 package nxproxy
 
 import (
-	"errors"
 	"io"
 )
 
 func ReadN(reader io.Reader, n int) ([]byte, error) {
 
 	if n <= 0 {
-		return nil, errors.New("buffer size is zero")
+		return nil, nil
 	}
 
 	buff := make([]byte, n)
@@ -20,4 +19,9 @@ func ReadN(reader io.Reader, n int) ([]byte, error) {
 	}
 
 	return buff, err
+}
+
+func ReadByte(reader io.Reader) (byte, error) {
+	buff, err := ReadN(reader, 1)
+	return buff[0], err
 }

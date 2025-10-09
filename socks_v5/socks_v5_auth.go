@@ -24,6 +24,19 @@ const (
 	AuthMethodUnacceptable       = AuthMethod(0xff)
 )
 
+func (val AuthMethod) Valid() bool {
+	return val == AuthMethodNone ||
+		val == AuthMethodGSSAPI ||
+		val == AuthMethodPassword ||
+		val == AuthMethodChallengeHandshake ||
+		val == AuthMethodChallengeResponse ||
+		val == AuthMethodSSL ||
+		val == AuthMethodNDSAuth ||
+		val == AuthMethodMultiAuthFramework ||
+		val == AuthMethodJSON ||
+		val == AuthMethodUnacceptable
+}
+
 func (val AuthMethod) String() string {
 	switch val {
 	case AuthMethodNone:
@@ -44,8 +57,10 @@ func (val AuthMethod) String() string {
 		return "multi_auth_framework"
 	case AuthMethodJSON:
 		return "json"
+	case AuthMethodUnacceptable:
+		return "unacceptable"
 	default:
-		return ""
+		return fmt.Sprintf("<%d>", val)
 	}
 }
 
@@ -54,7 +69,7 @@ func readAuthMethods(reader io.Reader) (map[AuthMethod]bool, error) {
 	header, err := nxproxy.ReadN(reader, 2)
 	if err != nil {
 		return nil, err
-	} else if header[0] != Version {
+	} else if header[0] != ProtoVersionByte {
 		return nil, fmt.Errorf("unsupported protocol version: %x", header[0])
 	}
 
@@ -70,7 +85,7 @@ func readAuthMethods(reader io.Reader) (map[AuthMethod]bool, error) {
 
 	methodMap := make(map[AuthMethod]bool)
 	for _, val := range methodBuff {
-		if method := AuthMethod(val); method.String() == "" {
+		if method := AuthMethod(val); method.Valid() {
 			methodMap[method] = true
 		}
 	}
@@ -88,6 +103,10 @@ const (
 
 type UserPassword struct {
 	User, Password string
+}
+
+func replyAuth(conn net.Conn, val AuthMethod) error {
+	return reply(conn, Reply(val), nil)
 }
 
 // In accordance to https://datatracker.ietf.org/doc/html/rfc1929

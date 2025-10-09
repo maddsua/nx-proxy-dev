@@ -4,56 +4,116 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"strconv"
+
+	nxproxy "github.com/maddsua/nx-proxy"
 )
 
 const (
-	AddrIPv4   = byte(0x01)
-	AddrDomain = byte(0x03)
-	AddrIPv6   = byte(0x04)
+	AddrIPv4       = byte(0x01)
+	AddrDomainName = byte(0x03)
+	AddrIPv6       = byte(0x04)
 )
 
-type Addr string
+type Addr struct {
+	Host string
+	Port uint16
+}
 
-func (addr Addr) MarshallBinary() ([]byte, error) {
+func (val Addr) String() string {
+	return net.JoinHostPort(val.Host, strconv.Itoa(int(val.Port)))
+}
 
-	if addr == "" {
+func (val *Addr) MarshallBinary() ([]byte, error) {
+
+	if val == nil {
 		return nil, nil
 	}
 
 	var buff bytes.Buffer
 
-	hostStr, portStr, err := net.SplitHostPort(string(addr))
-	if err != nil {
-		return nil, fmt.Errorf("invalid 'addr:port': %v", err)
+	if ip := net.ParseIP(val.Host); ip != nil {
+
+		if ip4 := ip.To4(); ip4 != nil {
+			buff.WriteByte(AddrIPv4)
+			buff.Write(ip4)
+		} else {
+			buff.WriteByte(AddrIPv6)
+			buff.Write(ip)
+		}
+
+	} else {
+		buff.WriteByte(AddrDomainName)
+		buff.WriteString(val.Host)
 	}
 
-	hostAddr := net.ParseIP(hostStr)
-
-	switch {
-	case len(hostAddr) == net.IPv4len:
-		buff.WriteByte(AddrIPv4)
-		buff.Write(hostAddr)
-	case len(hostAddr) == net.IPv6len:
-		buff.WriteByte(AddrIPv6)
-		buff.Write(hostAddr)
-	default:
-		buff.WriteByte(AddrDomain)
-		buff.WriteString(hostStr)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid port number: %v", err)
-	}
-
-	buff.Write(binary.BigEndian.AppendUint16(nil, uint16(port)))
+	buff.Write(binary.BigEndian.AppendUint16(nil, uint16(val.Port)))
 
 	if buff.Len() > math.MaxUint8 {
 		return nil, fmt.Errorf("address too large")
 	}
 
 	return buff.Bytes(), nil
+}
+
+func readAddr(reader io.Reader) (*Addr, error) {
+
+	addrType, err := nxproxy.ReadByte(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	addr := Addr{}
+
+	switch addrType {
+
+	case AddrIPv4:
+
+		buff, err := nxproxy.ReadN(reader, net.IPv4len)
+		if err != nil {
+			return nil, err
+		}
+
+		addr.Host = net.IP(buff).String()
+
+	case AddrIPv6:
+
+		buff, err := nxproxy.ReadN(reader, net.IPv6len)
+		if err != nil {
+			return nil, err
+		}
+
+		addr.Host = net.IP(buff).String()
+
+	case AddrDomainName:
+
+		domainLen, err := nxproxy.ReadByte(reader)
+		if err != nil {
+			return nil, err
+		} else if domainLen <= 0 {
+			return nil, fmt.Errorf("invalid domain name length")
+		}
+
+		domain, err := nxproxy.ReadN(reader, int(domainLen))
+		if err != nil {
+			return nil, err
+		}
+
+		addr.Host = string(domain)
+
+	default:
+		return nil, fmt.Errorf("invalid addr type: %x", addrType)
+	}
+
+	portBuff, err := nxproxy.ReadN(reader, 2)
+	if err != nil {
+		return nil, err
+	}
+
+	addr.Port = binary.BigEndian.Uint16(portBuff)
+
+	return &addr, nil
 }
