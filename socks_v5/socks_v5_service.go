@@ -26,6 +26,8 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 
 	svc.ctx, svc.cancelFn = context.WithCancel(context.Background())
 
+	svc.slot.BaseContext = svc.ctx
+
 	go svc.acceptConns()
 
 	return &svc, nil

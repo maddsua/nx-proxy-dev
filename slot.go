@@ -1,6 +1,7 @@
 package nxproxy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -54,7 +55,8 @@ type SlotOptions struct {
 
 type Slot struct {
 	SlotOptions
-	Server SlotService
+
+	BaseContext context.Context
 
 	deferredDeltas []PeerDelta
 
@@ -167,7 +169,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			slot.deferPeerDelta(peer)
 		}
 
-		newPeerMap[entry.ID] = &Peer{PeerOptions: entry}
+		newPeerMap[entry.ID] = &Peer{PeerOptions: entry, BaseContext: slot.BaseContext}
 	}
 
 	//	remove old peers
@@ -195,10 +197,6 @@ func (slot *Slot) Close() (err error) {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
-
-	if slot.Server != nil {
-		err = slot.Server.Close()
-	}
 
 	for key, peer := range slot.peerMap {
 		peer.Close()

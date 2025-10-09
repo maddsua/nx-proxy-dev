@@ -55,6 +55,8 @@ type PeerBandwidth struct {
 type Peer struct {
 	PeerOptions
 
+	BaseContext context.Context
+
 	DataReceived atomic.Uint64
 	DataSent     atomic.Uint64
 
@@ -131,7 +133,12 @@ func (peer *Peer) Connection() (*PeerConnection, error) {
 		bandwTx: baseBandwidth(bandwidth.Tx, bandwidth.MinTx),
 	}
 
-	conn.ctx, conn.cancelFn = context.WithCancel(context.Background())
+	baseCtx := peer.BaseContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	conn.ctx, conn.cancelFn = context.WithCancel(baseCtx)
 
 	peer.connMap[nextID] = &conn
 
