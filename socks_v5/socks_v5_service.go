@@ -10,64 +10,84 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
 )
 
-type Server struct {
-	Addr string
-	Auth nxproxy.PasswordAuthenticator
+func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 
-	mtx      sync.Mutex
-	active   atomic.Bool
-	listener net.Listener
-	wg       sync.WaitGroup
-	err      error
-}
+	svc := service{slot: nxproxy.Slot{SlotOptions: opts}}
+	var err error
 
-func (svc *Server) ListenAndServe() error {
+	addr, proto, _ := nxproxy.SplitNetworkType(opts.BindAddr)
 
-	svc.mtx.Lock()
-	defer svc.mtx.Unlock()
-
-	if svc.active.Load() {
-		if err := svc.Close(); err != nil {
-			return fmt.Errorf("restart: %v", err)
-		}
+	if svc.listener, err = net.Listen(proto, addr); err != nil {
+		return nil, fmt.Errorf("listen: %v", err)
 	}
 
-	svc.listener, svc.err = net.Listen("tcp", svc.Addr)
-	if svc.err != nil {
-		return svc.err
-	}
+	go svc.acceptConns()
 
 	svc.active.Store(true)
 
-	go svc.acceptConns()
+	return &svc, nil
+}
+
+type service struct {
+	slot nxproxy.Slot
+
+	active   atomic.Bool
+	listener net.Listener
+	wg       sync.WaitGroup
+}
+
+func (svc *service) ID() uuid.UUID {
+	return svc.slot.SlotOptions.ID
+}
+
+func (svc *service) Proto() nxproxy.ProxyProto {
+	return svc.slot.SlotOptions.Proto
+}
+
+func (svc *service) BindAddr() string {
+	return svc.slot.SlotOptions.BindAddr
+}
+
+func (svc *service) Deltas() []nxproxy.SlotDelta {
+	return svc.slot.Deltas()
+}
+
+func (svc *service) SetPeers(entries []nxproxy.PeerOptions) {
+	svc.slot.SetPeers(entries)
+}
+
+func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
+
+	haveOpts := svc.slot.SlotOptions
+
+	//	service proto and bind addr aren't hot-swappable; you have to start a different service instead
+	if haveOpts.Proto != opts.Proto || haveOpts.BindAddr != opts.BindAddr {
+		return nxproxy.ErrSlotOptionsIncompatible
+	}
+
+	svc.slot.SlotOptions = opts
 
 	return nil
 }
 
-func (svc *Server) Error() error {
-	return svc.err
-}
-
-func (svc *Server) Close() error {
-
-	svc.mtx.Lock()
-	defer svc.mtx.Unlock()
+func (svc *service) Close() error {
 
 	if !svc.active.Load() {
 		return nil
 	}
 
 	svc.active.Store(false)
-	svc.err = svc.listener.Close()
+	err := svc.listener.Close()
 	svc.wg.Wait()
 
-	return svc.err
+	return err
 }
 
-func (svc *Server) acceptConns() {
+func (svc *service) acceptConns() {
 
 	for svc.active.Load() {
 
@@ -82,7 +102,7 @@ func (svc *Server) acceptConns() {
 	}
 }
 
-func (svc *Server) handleConn(conn net.Conn) {
+func (svc *service) handleConn(conn net.Conn) {
 
 	defer func() {
 
@@ -107,7 +127,7 @@ func (svc *Server) handleConn(conn net.Conn) {
 
 	if _, has := methods[AuthMethodPassword]; has {
 
-		if peer, err = connPasswordAuth(conn, svc.Auth); err != nil {
+		if peer, err = connPasswordAuth(conn, &svc.slot); err != nil {
 
 			client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
 			host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
@@ -185,7 +205,7 @@ func (svc *Server) handleConn(conn net.Conn) {
 	}
 }
 
-func (svc *Server) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
+func (svc *service) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
 
 	connCtl, err := peer.Connection()
 	if err != nil {

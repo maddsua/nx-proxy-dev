@@ -13,7 +13,7 @@ import (
 )
 
 type ServiceHub struct {
-	bindMap        map[string]*nxproxy.Slot
+	bindMap        map[string]nxproxy.SlotService
 	mtx            sync.Mutex
 	deferredDeltas []nxproxy.SlotDelta
 }
@@ -24,18 +24,10 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 	defer hub.mtx.Unlock()
 
 	if hub.bindMap == nil {
-		hub.bindMap = map[string]*nxproxy.Slot{}
+		hub.bindMap = map[string]nxproxy.SlotService{}
 	}
 
 	importedSlotIDSet := map[uuid.UUID]struct{}{}
-
-	var slotServiceOk = func(slot *nxproxy.Slot) bool {
-		return slot.Server != nil && slot.Server.Error() == nil
-	}
-
-	var isSameSlotService = func(slot *nxproxy.Slot, opt *nxproxy.ServiceOptions) bool {
-		return slot.SlotOptions.Proto == opt.Slot.Proto
-	}
 
 	var slotOptsValid = func(slot *nxproxy.SlotOptions) error {
 
@@ -56,7 +48,7 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 		return nil
 	}
 
-	newBindMap := map[string]*nxproxy.Slot{}
+	newBindMap := map[string]nxproxy.SlotService{}
 
 	for _, entry := range entries {
 
@@ -77,27 +69,25 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 
 		if slot, has := hub.bindMap[bindAddr]; has {
 
-			if isSameSlotService(slot, &entry) && slotServiceOk(slot) {
+			if err := slot.SetOptions(entry.Slot); err == nil {
 
-				//	update options and peer list
-				slot.SlotOptions = entry.Slot
-				slot.ImportPeerList(entry.Peers)
+				slot.SetPeers(entry.Peers)
 
 				//	remove from the old bind map
 				newBindMap[bindAddr] = slot
 				delete(hub.bindMap, bindAddr)
 
 				slog.Debug("ServiceHub: Update slot",
-					slog.String("id", slot.ID.String()),
-					slog.String("type", string(slot.SlotOptions.Proto)),
-					slog.String("addr", slot.SlotOptions.BindAddr))
+					slog.String("id", slot.ID().String()),
+					slog.String("proto", string(slot.Proto())),
+					slog.String("addr", slot.BindAddr()))
 
 				continue
 			}
 
 			if err := slot.Close(); err != nil {
-				slog.Error("ServiceHub: Replace slot: Close old slot",
-					slog.String("id", slot.ID.String()),
+				slog.Error("ServiceHub: Replace slot: Close outdated slot",
+					slog.String("id", slot.ID().String()),
 					slog.String("err", err.Error()))
 				continue
 			}
@@ -105,38 +95,38 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 			hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
 		}
 
-		slot := nxproxy.Slot{SlotOptions: entry.Slot}
-		slot.ImportPeerList(entry.Peers)
+		var slot nxproxy.SlotService
 
-		switch slot.SlotOptions.Proto {
+		switch entry.Slot.Proto {
 		case nxproxy.ProxyProtoSocks:
-			slot.Server = &socksv5.Server{Addr: bindAddr, Auth: &slot}
+			if slot, err = socksv5.NewService(entry.Slot); err != nil {
+				slog.Error("ServiceHub: Create slot: Socks5",
+					slog.String("id", slot.ID().String()),
+					slog.String("err", err.Error()))
+				continue
+			}
 		default:
-			//	todo: replace with a http impl
-			slot.Server = &nxproxy.DummyService{Addr: slot.BindAddr, Auth: &slot, DisplayType: string(entry.Slot.Proto)}
-		}
-
-		if err := slot.Server.ListenAndServe(); err != nil {
-			slog.Error("ServiceHub: Create slot: Start service",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("err", err.Error()))
+			slog.Error("ServiceHub: Create slot: Unsupported service protocol",
+				slog.String("id", entry.Slot.ID.String()),
+				slog.String("proto", string(entry.Slot.Proto)))
 			continue
 		}
 
+		slot.SetPeers(entry.Peers)
+
 		if _, has := hub.bindMap[bindAddr]; has {
 			slog.Info("ServiceHub: Replace slot",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("addr", slot.SlotOptions.BindAddr))
+				slog.String("id", slot.ID().String()),
+				slog.String("type", string(slot.Proto())),
+				slog.String("addr", slot.BindAddr()))
 		} else {
 			slog.Info("ServiceHub: Create slot",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("addr", slot.SlotOptions.BindAddr))
+				slog.String("id", slot.ID().String()),
+				slog.String("type", string(slot.Proto())),
+				slog.String("addr", slot.BindAddr()))
 		}
 
-		newBindMap[bindAddr] = &slot
+		newBindMap[bindAddr] = slot
 	}
 
 	//	remove slot entries that weren't updated
@@ -146,25 +136,25 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 
 			if newSlot, has := newBindMap[key]; has {
 				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
-					slog.String("old_id", slot.ID.String()),
-					slog.String("new_id", newSlot.ID.String()),
+					slog.String("old_id", slot.ID().String()),
+					slog.String("new_id", newSlot.ID().String()),
 					slog.String("err", err.Error()))
 				newBindMap[key] = slot
 			} else {
 				slog.Error("ServiceHub: Slot failed to terminate; Unable to overwrite a newer slot entry",
-					slog.String("old_id", slot.ID.String()),
-					slog.String("new_id", newSlot.ID.String()),
-					slog.String("type", string(slot.SlotOptions.Proto)),
-					slog.String("addr", slot.SlotOptions.BindAddr),
+					slog.String("old_id", slot.ID().String()),
+					slog.String("new_id", newSlot.ID().String()),
+					slog.String("type", string(slot.Proto())),
+					slog.String("addr", slot.BindAddr()),
 					slog.String("err", err.Error()))
 				slog.Warn("ServiceHub: Possible service binding conflict")
 			}
 
 		} else {
 			slog.Info("ServiceHub: Remove outdated slot",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("addr", slot.SlotOptions.BindAddr))
+				slog.String("id", slot.ID().String()),
+				slog.String("type", string(slot.Proto())),
+				slog.String("addr", slot.BindAddr()))
 		}
 
 		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
@@ -199,15 +189,15 @@ func (hub *ServiceHub) CloseSlots() {
 
 		if err := slot.Close(); err != nil {
 			slog.Error("ServiceHub: Slot failed to terminate",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("addr", slot.SlotOptions.BindAddr),
+				slog.String("id", slot.ID().String()),
+				slog.String("proto", string(slot.Proto())),
+				slog.String("addr", slot.BindAddr()),
 				slog.String("err", err.Error()))
 		} else {
 			slog.Info("ServiceHub: Terminate slot",
-				slog.String("id", slot.ID.String()),
-				slog.String("type", string(slot.SlotOptions.Proto)),
-				slog.String("addr", slot.SlotOptions.BindAddr))
+				slog.String("id", slot.ID().String()),
+				slog.String("proto", string(slot.Proto())),
+				slog.String("addr", slot.BindAddr()))
 		}
 
 		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)

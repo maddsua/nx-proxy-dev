@@ -13,6 +13,37 @@ import (
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
+var ErrSlotOptionsIncompatible = errors.New("slot options incompatible")
+
+type PasswordAuthenticator interface {
+	LookupWithPassword(username, password string) (*Peer, error)
+}
+
+type SlotService interface {
+	ID() uuid.UUID
+	Proto() ProxyProto
+	BindAddr() string
+	Deltas() []SlotDelta
+	SetPeers(entries []PeerOptions)
+	SetOptions(opts SlotOptions) error
+	Close() error
+}
+
+type ProxyProto string
+
+func (val ProxyProto) Valid() bool {
+	return val == ProxyProtoHttp || val == ProxyProtoSocks
+}
+
+const (
+	ProxyProtoSocks = ProxyProto("socks")
+	ProxyProtoHttp  = ProxyProto("http")
+)
+
+type ServiceOptions struct {
+	Slot  SlotOptions   `json:"slot"`
+	Peers []PeerOptions `json:"peers"`
+}
 
 type SlotOptions struct {
 	ID       uuid.UUID  `json:"id"`
@@ -22,7 +53,7 @@ type SlotOptions struct {
 
 type Slot struct {
 	SlotOptions
-	Server SlotServer
+	Server SlotService
 
 	deferredDeltas []PeerDelta
 
@@ -76,7 +107,7 @@ func (slot *Slot) deferPeerDelta(peer *Peer) {
 	}
 }
 
-func (slot *Slot) ImportPeerList(entries []PeerOptions) {
+func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()

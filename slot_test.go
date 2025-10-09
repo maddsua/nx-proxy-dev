@@ -11,7 +11,7 @@ func TestSlotPeerImport(t *testing.T) {
 
 	var slot nxproxy.Slot
 
-	slot.ImportPeerList([]nxproxy.PeerOptions{
+	slot.SetPeers([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("b9cfd40e-255c-4101-85b9-73ab9efb509f"),
 			PasswordAuth: &nxproxy.PeerPasswordAuth{
@@ -38,7 +38,7 @@ func TestSlotPeerImport(t *testing.T) {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
 
-	slot.ImportPeerList([]nxproxy.PeerOptions{
+	slot.SetPeers([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("b9cfd40e-255c-4101-85b9-73ab9efb509f"),
 			PasswordAuth: &nxproxy.PeerPasswordAuth{
@@ -65,7 +65,7 @@ func TestSlotDeltas(t *testing.T) {
 
 	var slot nxproxy.Slot
 
-	slot.ImportPeerList([]nxproxy.PeerOptions{
+	slot.SetPeers([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("4f33d96b-3f6e-4d29-8936-0e0490c44d93"),
 			PasswordAuth: &nxproxy.PeerPasswordAuth{
@@ -104,7 +104,7 @@ func TestSlotDeltas(t *testing.T) {
 		peer.Close()
 	}
 
-	slot.ImportPeerList([]nxproxy.PeerOptions{
+	slot.SetPeers([]nxproxy.PeerOptions{
 		{
 			ID: uuid.MustParse("4f33d96b-3f6e-4d29-8936-0e0490c44d93"),
 			PasswordAuth: &nxproxy.PeerPasswordAuth{
