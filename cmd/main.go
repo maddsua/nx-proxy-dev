@@ -68,7 +68,6 @@ func main() {
 		var retryQueue []nxproxy.SlotDelta
 
 		defer wg.Done()
-		defer slog.Debug("Routine: API: PostMetrics: Exited")
 
 		var doUpdate = func() {
 
@@ -89,7 +88,8 @@ func main() {
 
 			retryQueue = nil
 
-			slog.Debug("API: PostMetrics OK")
+			slog.Debug("API: Metrics sent",
+				slog.String("remote", client.URL.Host))
 		}
 
 		ticker := time.NewTicker(30 * time.Second)
@@ -108,20 +108,23 @@ func main() {
 	go func() {
 
 		defer wg.Done()
-		defer slog.Debug("Routine: API: PullTable: Exited")
 
 		var pullConfig = func() {
 
 			cfg, err := client.PullConfig()
 			if err != nil {
-				slog.Error("API: PullConfig",
-					slog.String("err", err.Error()))
+				slog.Error("API: Pulling config",
+					slog.String("err", err.Error()),
+					slog.String("remote", client.URL.Host))
 				return
 			}
 
-			slog.Debug("API: PullConfig OK")
+			slog.Debug("API: Updating config",
+				slog.String("remote", client.URL.Host))
 
 			hub.SetConfig(cfg)
+
+			slog.Debug("API: Config updated")
 		}
 
 		ticker := time.NewTicker(15 * time.Second)
@@ -149,7 +152,7 @@ func main() {
 	close(doneCh)
 	hub.CloseSlots()
 
-	slog.Debug("Routine: Waiting for all to finish")
+	slog.Debug("Routine: Waiting for tasks to finish")
 	wg.Wait()
 
 	slog.Warn("Service stopped. Bye-Bye...")
