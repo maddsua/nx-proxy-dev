@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	nxproxy "github.com/maddsua/nx-proxy"
 	"github.com/maddsua/nx-proxy/rest/model"
@@ -97,9 +98,9 @@ func main() {
 			return
 		}
 
-		slog.Info("Received metrics",
+		slog.Info("Uptime",
 			slog.String("run_id", metrics.Service.RunID.String()),
-			slog.Int("uptime", int(metrics.Service.Uptime)))
+			slog.Duration("t", time.Duration(metrics.Service.Uptime)*time.Second))
 
 		for _, delta := range metrics.Deltas {
 			slog.Info("Delta",
