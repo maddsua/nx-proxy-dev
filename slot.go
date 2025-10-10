@@ -53,8 +53,7 @@ type Slot struct {
 	SlotOptions
 
 	BaseContext context.Context
-	//	todo: set default values or something
-	Rl RateLimiter
+	Rl          *RateLimiter
 
 	deferredDeltas []PeerDelta
 
@@ -217,14 +216,18 @@ func (slot *Slot) Close() (err error) {
 
 func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Peer, error) {
 
-	rlc := slot.Rl.Get("pw:" + ip.String())
-
-	if err := rlc.Use(); err != nil {
-		return nil, err
-	}
-
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
+
+	var rlc *RlCounter
+	if slot.Rl != nil {
+
+		rlc = slot.Rl.Get("pw:" + ip.String())
+
+		if err := rlc.Use(); err != nil {
+			return nil, err
+		}
+	}
 
 	if slot.peerMap == nil {
 		slot.peerMap = map[uuid.UUID]*Peer{}
@@ -258,7 +261,9 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 		return nil, ErrPasswordInvalid
 	}
 
-	rlc.Reset()
+	if rlc != nil {
+		rlc.Reset()
+	}
 
 	return peer, nil
 }
