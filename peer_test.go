@@ -54,7 +54,7 @@ func TestPeer_Bandwidth_1(t *testing.T) {
 	conn.AccountRx(200_000)
 	conn.AccountTx(20_000)
 
-	peer.RefreshState()
+	nxproxy.RedistributePeerBandwidth(peer.ConnectionList(), peer.Bandwidth)
 
 	if val, _ := conn.BandwidthRx(); val != 0 {
 		t.Errorf("unexpected rx rate: %d", val)
@@ -101,7 +101,7 @@ func TestPeer_Bandwidth_2(t *testing.T) {
 	conn.AccountRx(2_000)
 	conn.AccountTx(1_600)
 
-	peer.RefreshState()
+	nxproxy.RedistributePeerBandwidth(peer.ConnectionList(), peer.Bandwidth)
 
 	if val, _ := conn.BandwidthRx(); val != 7496 {
 		t.Errorf("unexpected rx rate: %d", val)
@@ -148,7 +148,7 @@ func TestPeer_Bandwidth_3(t *testing.T) {
 	conn.AccountRx(500)
 	conn.AccountTx(100)
 
-	peer.RefreshState()
+	nxproxy.RedistributePeerBandwidth(peer.ConnectionList(), peer.Bandwidth)
 
 	if val, _ := conn.BandwidthRx(); val != 1666 {
 		t.Errorf("unexpected rx rate: %d", val)

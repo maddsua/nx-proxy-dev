@@ -77,7 +77,7 @@ func (slot *Slot) Deltas() []SlotDelta {
 	slot.deferredDeltas = nil
 
 	for _, peer := range slot.peerMap {
-		if delta, has := peer.Deltas(); has {
+		if delta, has := peer.Delta(); has {
 			deltaList = append(deltaList, delta)
 		}
 	}
@@ -108,7 +108,7 @@ func (slot *Slot) Deltas() []SlotDelta {
 }
 
 func (slot *Slot) deferPeerDelta(peer *Peer) {
-	if delta, has := peer.Deltas(); has {
+	if delta, has := peer.Delta(); has {
 		slot.deferredDeltas = append(slot.deferredDeltas, delta)
 	}
 }
@@ -202,7 +202,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				continue
 			}
 
-			peer.Close()
+			peer.CloseConnections()
 			slot.deferPeerDelta(peer)
 		}
 
@@ -241,7 +241,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
 
-			peer.Close()
+			peer.CloseConnections()
 			slot.deferPeerDelta(peer)
 		}
 	}
@@ -265,7 +265,7 @@ func (slot *Slot) Close() (err error) {
 	defer slot.mtx.Unlock()
 
 	for key, peer := range slot.peerMap {
-		peer.Close()
+		peer.CloseConnections()
 		slot.deferPeerDelta(peer)
 		delete(slot.peerMap, key)
 	}
