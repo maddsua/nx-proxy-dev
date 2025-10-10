@@ -23,7 +23,7 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 
 	var err error
 
-	addr, proto, _ := nxproxy.SplitNetworkType(opts.BindAddr)
+	addr, proto, _ := nxproxy.SplitAddrNet(opts.BindAddr)
 
 	if svc.listener, err = net.Listen(proto, addr); err != nil {
 		return nil, fmt.Errorf("listen: %v", err)

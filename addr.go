@@ -30,7 +30,7 @@ func IsLocalAddress(addr string) bool {
 	return ipAddr.IP.IsLoopback() || ipAddr.IP.IsPrivate() || ipAddr.IP.IsUnspecified()
 }
 
-func SplitNetworkType(addr string) (string, string, bool) {
+func SplitAddrNet(addr string) (string, string, bool) {
 
 	if val, ok := strings.CutSuffix(addr, "/tcp"); ok {
 		return val, "tcp", true
