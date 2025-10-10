@@ -193,8 +193,10 @@ func (svc *service) serveConn(conn net.Conn) {
 	}
 
 	switch req.Cmd {
+
 	case CmdConnect:
 		svc.cmdConnect(conn, peer, req.Addr)
+
 	default:
 
 		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
@@ -211,11 +213,11 @@ func (svc *service) serveConn(conn net.Conn) {
 
 func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
 
+	client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+	host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
 	connCtl, err := peer.Connection()
 	if err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
 
 		slog.Debug("SOCKS5: Connect: Peer connection rejected",
 			slog.String("client_ip", client_ip.String()),
@@ -236,44 +238,35 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 
 	dstConn, err := peer.Dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
 	if err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
 		slog.Debug("SOCKSv5: Connect: Unable to dial destination",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("remote", remoteAddr.Host),
 			slog.String("err", err.Error()))
-
 		_ = reply(conn, ReplyErrHostUnreachable, remoteAddr)
-
 		return
 	}
 
 	defer dstConn.Close()
 
 	if err := reply(conn, ReplyOk, remoteAddr); err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
 		slog.Debug("SOCKSv5: Connect: Ack failed",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("remote", remoteAddr.Host),
 			slog.String("err", err.Error()))
-
 		return
 	}
 
+	slog.Debug("SOCKSv5: Connect",
+		slog.String("client_ip", client_ip.String()),
+		slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+		slog.String("peer", peer.DisplayName()),
+		slog.String("remote", remoteAddr.Host))
+
 	if err := nxproxy.ProxyBridge(connCtl, conn, dstConn); err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
 		slog.Debug("SOCKSv5: Connect: Broken pipe",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
