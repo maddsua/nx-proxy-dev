@@ -91,6 +91,8 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 
 		if apiResp.Error != nil {
 			return nil, fmt.Errorf("api: %v", apiResp.Error.Message)
+		} else if apiResp.Data == nil {
+			return nil, fmt.Errorf("api: empty data payload")
 		}
 
 		return apiResp.Data, nil
