@@ -121,8 +121,15 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
+	client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+	host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+
 	methods, err := readAuthMethods(conn)
 	if err != nil {
+		slog.Debug("SOCKS5: Handshake error",
+			slog.String("client_ip", client_ip.String()),
+			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("err", err.Error()))
 		_ = reply(conn, ReplyErrGeneric, nil)
 		return
 	}
@@ -132,11 +139,7 @@ func (svc *service) serveConn(conn net.Conn) {
 	if _, has := methods[AuthMethodPassword]; has {
 
 		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
-
-			client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-			host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
-			slog.Warn("SOCKS5: Password auth: Failed",
+			slog.Debug("SOCKS5: Password auth: Failed",
 				slog.String("client_ip", client_ip.String()),
 				slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 				slog.String("err", err.Error()))
@@ -150,63 +153,40 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	req, err := readRequest(conn)
 	if err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
-		slog.Warn("SOCKS5: Invalid request",
+		slog.Debug("SOCKS5: Invalid request",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("err", err.Error()))
-
 		_ = reply(conn, ReplyErrGeneric, nil)
-
 		return
 	}
 
 	if err := conn.SetDeadline(time.Time{}); err != nil {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
-		slog.Warn("SOCKS5: Reset io timeouts",
+		slog.Debug("SOCKS5: Reset io timeouts",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("err", err.Error()))
-
 		_ = reply(conn, ReplyErrGeneric, nil)
-
 		return
 	}
 
 	if nxproxy.IsLocalAddress(req.Addr.Host) {
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
 		slog.Warn("SOCKS5: Dest addr not allowed",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("dst", req.Addr.String()))
-
 		_ = reply(conn, ReplyErrConnNotAllowedByRuleset, nil)
+		return
 	}
 
 	switch req.Cmd {
-
 	case CmdConnect:
 		svc.cmdConnect(conn, peer, req.Addr)
-
 	default:
-
-		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-		host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
-
 		slog.Debug("SOCKS5: Command not supported",
 			slog.String("client_ip", client_ip.String()),
 			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
 			slog.String("cmd", req.Cmd.String()))
-
 		_ = reply(conn, ReplyErrCmdNotSupported, nil)
 	}
 }
