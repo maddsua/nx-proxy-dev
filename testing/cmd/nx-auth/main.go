@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	nxproxy "github.com/maddsua/nx-proxy"
 	"github.com/maddsua/nx-proxy/rest/model"
@@ -36,6 +35,14 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /config", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if val, err := LoadConfig(cfg.location); err != nil {
+			slog.Error("Reload config",
+				slog.String("loc", cfg.location),
+				slog.String("err", err.Error()))
+		} else {
+			cfg.Proxy = val.Proxy
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -117,36 +124,12 @@ func main() {
 		}
 	}()
 
-	ticker := time.NewTicker(time.Second)
-
-	go func() {
-
-		for {
-
-			if _, ok := <-ticker.C; !ok {
-				break
-			}
-
-			newCfg, err := LoadConfig(cfg.location)
-			if err != nil {
-				slog.Error("Reload config",
-					slog.String("loc", cfg.location),
-					slog.String("err", err.Error()))
-				continue
-			}
-
-			cfg.Proxy = newCfg.Proxy
-		}
-	}()
-
 	slog.Info("Listening",
 		slog.String("addr", srv.Addr))
 
 	select {
 	case <-exitCh:
 		srv.Close()
-		ticker.Stop()
-		os.Exit(0)
 	case err := <-errCh:
 		slog.Error("Serve",
 			slog.String("err", err.Error()))
