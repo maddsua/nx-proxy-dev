@@ -64,10 +64,7 @@ func (svc *service) BindAddr() string {
 
 func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
 
-	haveOpts := svc.SlotOptions
-
-	//	service proto and bind addr aren't hot-swappable; you have to start a different service instead
-	if haveOpts.Proto != opts.Proto || haveOpts.BindAddr != opts.BindAddr {
+	if svc.SlotOptions.Fingerprint() != opts.Fingerprint() {
 		return nxproxy.ErrSlotOptionsIncompatible
 	}
 

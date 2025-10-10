@@ -68,3 +68,48 @@ func ServiceBindAddr(addr string, service ProxyProto) (string, error) {
 
 	return net.JoinHostPort(prefix, strconv.Itoa(port)) + networkSuffix, nil
 }
+
+func ParseFramedIP(addr string) (net.IP, error) {
+
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid addr: %s", addr)
+	}
+
+	if assigned, err := AddrAssigned(ip); err != nil {
+		return nil, fmt.Errorf("check ip tables: %v", err)
+	} else if !assigned {
+		return nil, fmt.Errorf("addr not assigned: %s", addr)
+	}
+
+	return ip, nil
+}
+
+func TcpDialAddr(addr net.IP) net.Addr {
+	if addr != nil && !addr.IsLoopback() {
+		return &net.TCPAddr{IP: addr}
+	}
+	return nil
+}
+
+type AddrContainer interface {
+	Contains(val net.IP) bool
+}
+
+func AddrAssigned(addr net.IP) (bool, error) {
+
+	table, err := net.InterfaceAddrs()
+	if err != nil {
+		return false, err
+	}
+
+	for _, val := range table {
+		if val, ok := val.(AddrContainer); ok {
+			if val.Contains(addr) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}

@@ -50,6 +50,10 @@ type SlotOptions struct {
 	BindAddr string     `json:"bind_addr"`
 }
 
+func (opts *SlotOptions) Fingerprint() string {
+	return fmt.Sprintf("%s:%s", opts.Proto, opts.BindAddr)
+}
+
 type Slot struct {
 	SlotOptions
 
@@ -155,12 +159,24 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			continue
 		}
 
+		framedIP, err := ParseFramedIP(entry.FramedIP)
+		if err != nil {
+			slog.Warn("Slot: Import peer: Framed IP not available",
+				slog.String("addr", entry.FramedIP))
+		}
+
 		if peer, ok := slot.peerMap[entry.ID]; ok {
 
 			if peer.PeerOptions.Fingerprint() == entry.Fingerprint() {
+
+				//	update peer props
 				peer.PeerOptions = entry
+				peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
+
+				//	update maps
 				newPeerMap[peer.ID] = peer
 				delete(slot.peerMap, entry.ID)
+
 				continue
 			}
 
@@ -172,10 +188,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			PeerOptions: entry,
 			BaseContext: slot.BaseContext,
 			Dialer: net.Dialer{
-
-				Resolver: slot.DNS.Resolver(),
-				//	todo: set local address when specified
-
+				Resolver:  slot.DNS.Resolver(),
+				LocalAddr: TcpDialAddr(framedIP),
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
 			},

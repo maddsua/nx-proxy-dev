@@ -21,6 +21,7 @@ type PeerOptions struct {
 	PasswordAuth   *PeerPasswordAuth `json:"password_auth"`
 	MaxConnections uint              `json:"max_connections"`
 	Bandwidth      PeerBandwidth     `json:"bandwidth"`
+	FramedIP       string            `json:"framed_ip"`
 }
 
 func (peer *PeerOptions) Fingerprint() string {
