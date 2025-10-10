@@ -71,6 +71,10 @@ func ServiceBindAddr(addr string, service ProxyProto) (string, error) {
 
 func ParseFramedIP(addr string) (net.IP, error) {
 
+	if addr == "" {
+		return nil, nil
+	}
+
 	ip := net.ParseIP(addr)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid addr: %s", addr)
