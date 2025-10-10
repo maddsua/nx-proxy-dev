@@ -1,13 +1,19 @@
 package nxproxy
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-var ErrRateLimited = errors.New("rate limited")
+type RateLimitError struct {
+	Expires time.Time
+}
+
+func (val *RateLimitError) Error() string {
+	return fmt.Sprintf("rate limited until %v", val.Expires)
+}
 
 var DefaultRatelimiter = RateLimiterOptions{
 	Quota:  50,
@@ -37,8 +43,9 @@ func (rlc *RlCounter) Use() error {
 	}
 
 	if rlc.quota.Add(-1) < 0 {
-		return ErrRateLimited
+		return &RateLimitError{Expires: rlc.expires}
 	}
+
 	return nil
 }
 

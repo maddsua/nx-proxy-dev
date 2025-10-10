@@ -137,10 +137,14 @@ func (svc *service) serveConn(conn net.Conn) {
 	if _, has := methods[AuthMethodPassword]; has {
 
 		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
-			slog.Debug("SOCKS5: Password auth: Failed",
-				slog.String("client_ip", clientIP.String()),
-				slog.String("proxy_addr", svc.SlotOptions.BindAddr),
-				slog.String("err", err.Error()))
+
+			if _, ok := err.(*nxproxy.RateLimitError); !ok {
+				slog.Debug("SOCKS5: Password auth: Failed",
+					slog.String("client_ip", clientIP.String()),
+					slog.String("proxy_addr", svc.SlotOptions.BindAddr),
+					slog.String("err", err.Error()))
+			}
+
 			return
 		}
 
