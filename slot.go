@@ -152,17 +152,22 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	for _, entry := range entries {
 
 		if err := peerOptsValid(&entry); err != nil {
-			slog.Warn("Slot: Import peer: Entry invalid; Skipped",
+			slog.Warn("Slot: Update peers: Peer option invalid; Skipped",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("peer_id", entry.ID.String()),
+				slog.String("name", entry.DisplayName()),
 				slog.String("err", err.Error()))
 			continue
 		}
 
 		framedIP, err := ParseFramedIP(entry.FramedIP)
 		if err != nil {
-			slog.Warn("Slot: Import peer: Framed IP not available",
-				slog.String("addr", entry.FramedIP))
+			slog.Warn("Slot: Update peers: Framed IP unavailable",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("id", entry.ID.String()),
+				slog.String("addr", entry.FramedIP),
+				slog.String("name", entry.DisplayName()),
+				slog.String("err", err.Error()))
 		}
 
 		if peer, ok := slot.peerMap[entry.ID]; ok {
@@ -176,6 +181,11 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				//	update maps
 				newPeerMap[peer.ID] = peer
 				delete(slot.peerMap, entry.ID)
+
+				slog.Debug("Slot: Update peer",
+					slog.String("slot_id", slot.ID.String()),
+					slog.String("id", peer.ID.String()),
+					slog.String("name", peer.DisplayName()))
 
 				continue
 			}
@@ -195,12 +205,30 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			},
 		}
 
+		if _, has := newPeerMap[entry.ID]; has {
+			slog.Debug("Slot: Replace peer",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("id", peer.ID.String()),
+				slog.String("name", peer.DisplayName()))
+		} else {
+			slog.Info("Slot: Create peer",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("id", peer.ID.String()),
+				slog.String("name", peer.DisplayName()))
+		}
+
 		newPeerMap[entry.ID] = &peer
 	}
 
 	//	remove old peers
 	for key, peer := range slot.peerMap {
 		if _, has := newPeerMap[key]; !has {
+
+			slog.Info("Slot: Remove peer",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("id", peer.ID.String()),
+				slog.String("name", peer.DisplayName()))
+
 			peer.Close()
 			slot.deferPeerDelta(peer)
 		}

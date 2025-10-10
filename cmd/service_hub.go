@@ -178,7 +178,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 			}
 
 		} else {
-			slog.Info("ServiceHub: Remove outdated slot",
+			slog.Info("ServiceHub: Remove slot",
 				slog.String("id", slot.ID().String()),
 				slog.String("type", string(slot.Proto())),
 				slog.String("addr", slot.BindAddr()))

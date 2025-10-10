@@ -24,6 +24,7 @@ type PeerOptions struct {
 	FramedIP       string            `json:"framed_ip"`
 }
 
+// TODO: simply drop connections if password has changed
 func (peer *PeerOptions) Fingerprint() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
