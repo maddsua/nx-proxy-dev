@@ -13,6 +13,7 @@ type RlCounter struct {
 	init    int64
 	quota   atomic.Int64
 	expires time.Time
+	mod     atomic.Bool
 }
 
 func (rlc *RlCounter) Reset() {
@@ -71,6 +72,7 @@ func (rl *RateLimiter) Get(key string) *RlCounter {
 	}
 
 	ctr.expires = now.Add(rl.Window)
+	ctr.mod.Store(true)
 
 	return ctr
 }
@@ -85,8 +87,15 @@ func (rl *RateLimiter) cleanup() {
 	now := time.Now()
 
 	for key, entry := range rl.entries {
+
 		if entry.expires.Before(now) {
-			entry.resetTo(rl.Quota)
+
+			if entry.mod.Load() {
+				entry.resetTo(rl.Quota)
+				entry.mod.Store(false)
+				continue
+			}
+
 			delete(rl.entries, key)
 		}
 	}
