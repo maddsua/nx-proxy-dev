@@ -152,7 +152,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	for _, entry := range entries {
 
 		if err := peerOptsValid(&entry); err != nil {
-			slog.Warn("Slot: Update peers: Peer option invalid; Skipped",
+			slog.Warn("Update peers: Peer option invalid; Skipped",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("peer_id", entry.ID.String()),
 				slog.String("name", entry.DisplayName()),
@@ -162,7 +162,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 		framedIP, err := ParseFramedIP(entry.FramedIP)
 		if err != nil {
-			slog.Warn("Slot: Update peers: Framed IP unavailable",
+			slog.Warn("Update peers: Framed IP unavailable",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", entry.ID.String()),
 				slog.String("addr", entry.FramedIP),
@@ -174,15 +174,27 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 			if peer.PeerOptions.Fingerprint() == entry.Fingerprint() {
 
+				//	check if we have to reauthenticate
+				mustReauth := !peer.PeerOptions.CmpCredentials(entry)
+
 				//	update peer props
 				peer.PeerOptions = entry
 				peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
+
+				if mustReauth {
+					slog.Debug("Peer credentials changed; Must reauthenticate",
+						slog.String("slot_id", slot.ID.String()),
+						slog.String("id", peer.ID.String()),
+						slog.String("name", peer.DisplayName()))
+
+					peer.CloseConnections()
+				}
 
 				//	update maps
 				newPeerMap[peer.ID] = peer
 				delete(slot.peerMap, entry.ID)
 
-				slog.Debug("Slot: Update peer",
+				slog.Debug("Update peer",
 					slog.String("slot_id", slot.ID.String()),
 					slog.String("id", peer.ID.String()),
 					slog.String("name", peer.DisplayName()))
@@ -206,12 +218,12 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		}
 
 		if _, has := newPeerMap[entry.ID]; has {
-			slog.Debug("Slot: Replace peer",
+			slog.Debug("Replace peer",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
 		} else {
-			slog.Info("Slot: Create peer",
+			slog.Info("Create peer",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
@@ -224,7 +236,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	for key, peer := range slot.peerMap {
 		if _, has := newPeerMap[key]; !has {
 
-			slog.Info("Slot: Remove peer",
+			slog.Info("Remove peer",
 				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))

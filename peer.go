@@ -24,14 +24,23 @@ type PeerOptions struct {
 	FramedIP       string            `json:"framed_ip"`
 }
 
-// TODO: simply drop connections if password has changed
 func (peer *PeerOptions) Fingerprint() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
-		return fmt.Sprintf("%v:pass:%s:%s", peer.ID, auth.UserName, auth.Password)
+		return fmt.Sprintf("%v:pass:%s", peer.ID, auth.UserName)
 	}
 
 	return "<nil>"
+}
+
+func (peer *PeerOptions) CmpCredentials(other PeerOptions) bool {
+
+	if auth := peer.PasswordAuth; auth != nil && other.PasswordAuth != nil {
+		return auth.UserName == other.PasswordAuth.UserName &&
+			auth.Password == other.PasswordAuth.Password
+	}
+
+	return false
 }
 
 func (peer *PeerOptions) DisplayName() string {
@@ -286,11 +295,7 @@ func (peer *Peer) RefreshState() {
 	}
 }
 
-func (peer *Peer) Close() {
-
-	if !peer.closed.CompareAndSwap(false, true) {
-		return
-	}
+func (peer *Peer) CloseConnections() {
 
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
@@ -304,7 +309,16 @@ func (peer *Peer) Close() {
 
 		delete(peer.connMap, key)
 	}
+}
 
+// todo: nuke
+func (peer *Peer) Close() {
+
+	if !peer.closed.CompareAndSwap(false, true) {
+		return
+	}
+
+	peer.CloseConnections()
 	peer.refreshActive.Store(false)
 }
 
