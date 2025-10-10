@@ -71,6 +71,11 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+
+		if err, ok := err.(*url.Error); ok {
+			return nil, err.Err
+		}
+
 		return nil, err
 	}
 
