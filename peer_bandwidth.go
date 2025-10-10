@@ -68,16 +68,13 @@ func RedistributePeerBandwidth(conns []*PeerConnection, bandwidth PeerBandwidth)
 	//	redistribute extra bandwidth and take data volume stats
 	for _, conn := range conns {
 
-		volRx := conn.deltaRx.Swap(0)
-		volTx := conn.deltaTx.Swap(0)
-
 		var extraRx, extraTx uint32
 
-		if nsatRx > 0 && volRx >= satThresholdRx {
+		if nsatRx > 0 && conn.deltaRx.Load() >= satThresholdRx {
 			extraRx = unusedRx / uint32(nsatRx)
 		}
 
-		if nsatTx > 0 && volTx >= satThresholdTx {
+		if nsatTx > 0 && conn.deltaTx.Load() >= satThresholdTx {
 			extraTx = unusedTx / uint32(nsatTx)
 		}
 
