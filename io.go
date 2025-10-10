@@ -69,7 +69,9 @@ func ProxyBridge(ctl *PeerConnection, clientConn net.Conn, remoteConn net.Conn) 
 	return
 }
 
+// Implementations of BandwidthFn must return the data volume in bytes that a connection may copy in one second at most
 type BandwidthFn func() (int, bool)
+
 type AccountFn func(delta int)
 
 // Forwards data from src to dst while limiting data rate and accounting for traffic volume
@@ -79,7 +81,7 @@ func SpliceConn(ctx context.Context, dst io.Writer, src io.Reader, bw BandwidthF
 
 	var copyLimit = func(bandwidth int) error {
 
-		chunk := make([]byte, FramedVolume(bandwidth))
+		chunk := make([]byte, bandwidth)
 		started := time.Now()
 
 		read, err := src.Read(chunk)
@@ -147,16 +149,5 @@ func FramedIoWait(bandwidth int, size int, started time.Time) {
 
 // Returns the amount of time it's expected for an IO operation to take. Bandwidth in bps, size in bytes
 func FramedIoDuration(bandwidth int, size int) time.Duration {
-	tp := FramedVolume(bandwidth)
-	return time.Duration(int64(time.Second) * int64(size) / int64(tp))
-}
-
-// Converts network bandwidth into data volume
-func FramedVolume(bandwidth int) int {
-	return max(0, bandwidth/8)
-}
-
-// Converts data volume into network bandwidth
-func FramedBandwidth(volume int) int {
-	return max(0, volume*8)
+	return time.Duration(int64(time.Second) * int64(size) / int64(bandwidth))
 }
