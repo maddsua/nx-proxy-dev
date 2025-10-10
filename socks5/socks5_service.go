@@ -15,7 +15,12 @@ import (
 
 func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 
-	svc := service{slot: nxproxy.Slot{SlotOptions: opts}}
+	svc := service{
+		Slot: nxproxy.Slot{
+			SlotOptions: opts,
+		},
+	}
+
 	var err error
 
 	addr, proto, _ := nxproxy.SplitNetworkType(opts.BindAddr)
@@ -26,7 +31,7 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 
 	svc.ctx, svc.cancelFn = context.WithCancel(context.Background())
 
-	svc.slot.BaseContext = svc.ctx
+	svc.BaseContext = svc.ctx
 
 	go svc.acceptConns()
 
@@ -34,7 +39,7 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 }
 
 type service struct {
-	slot nxproxy.Slot
+	nxproxy.Slot
 
 	ctx      context.Context
 	cancelFn context.CancelFunc
@@ -42,35 +47,27 @@ type service struct {
 }
 
 func (svc *service) ID() uuid.UUID {
-	return svc.slot.SlotOptions.ID
+	return svc.SlotOptions.ID
 }
 
 func (svc *service) Proto() nxproxy.ProxyProto {
-	return svc.slot.SlotOptions.Proto
+	return svc.SlotOptions.Proto
 }
 
 func (svc *service) BindAddr() string {
-	return svc.slot.SlotOptions.BindAddr
-}
-
-func (svc *service) Deltas() []nxproxy.SlotDelta {
-	return svc.slot.Deltas()
-}
-
-func (svc *service) SetPeers(entries []nxproxy.PeerOptions) {
-	svc.slot.SetPeers(entries)
+	return svc.SlotOptions.BindAddr
 }
 
 func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
 
-	haveOpts := svc.slot.SlotOptions
+	haveOpts := svc.SlotOptions
 
 	//	service proto and bind addr aren't hot-swappable; you have to start a different service instead
 	if haveOpts.Proto != opts.Proto || haveOpts.BindAddr != opts.BindAddr {
 		return nxproxy.ErrSlotOptionsIncompatible
 	}
 
-	svc.slot.SlotOptions = opts
+	svc.SlotOptions = opts
 
 	return nil
 }
@@ -133,7 +130,7 @@ func (svc *service) handleConn(conn net.Conn) {
 
 	if _, has := methods[AuthMethodPassword]; has {
 
-		if peer, err = connPasswordAuth(conn, &svc.slot); err != nil {
+		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
 
 			client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
 			host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
