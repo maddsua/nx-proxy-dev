@@ -54,7 +54,7 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 	var bodyReader io.Reader
 	if payload != nil {
 		var buff bytes.Buffer
-		if err := json.NewEncoder(&buff).Encode(path); err != nil {
+		if err := json.NewEncoder(&buff).Encode(payload); err != nil {
 			return nil, fmt.Errorf("marshal: %v", err)
 		}
 		bodyReader = &buff
