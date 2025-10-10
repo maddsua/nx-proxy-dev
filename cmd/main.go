@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -18,11 +19,14 @@ import (
 
 func main() {
 
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-
 	configFileEntries := LoadConfigFile()
 	if configFileEntries == nil {
-		slog.Warn("No config file found")
+		slog.Warn("No config files found")
+	}
+
+	if val, _ := GetConfigOpt(configFileEntries, "DEBUG"); strings.ToLower(val) == "true" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+		slog.Debug("ENABLED")
 	}
 
 	var client rest.Client
