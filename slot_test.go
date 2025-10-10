@@ -28,12 +28,12 @@ func TestSlotPeerImport(t *testing.T) {
 		},
 	})
 
-	persistedPeer, err := slot.LookupWithPassword("maddsua", "test123")
+	persistedPeer, err := slot.LookupWithPassword(nil, "maddsua", "test123")
 	if err != nil {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
 
-	ephemeralPeer, err := slot.LookupWithPassword("someoneelse", "88888888888")
+	ephemeralPeer, err := slot.LookupWithPassword(nil, "someoneelse", "88888888888")
 	if err != nil {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestSlotPeerImport(t *testing.T) {
 		},
 	})
 
-	if _, err := slot.LookupWithPassword("someoneelse", "88888888888"); err != nxproxy.ErrUserNotFound {
+	if _, err := slot.LookupWithPassword(nil, "someoneelse", "88888888888"); err != nxproxy.ErrUserNotFound {
 		t.Fatalf("LookupWithPassword: %v", err)
 	}
 
@@ -89,14 +89,14 @@ func TestSlotDeltas(t *testing.T) {
 		},
 	})
 
-	if peer, err := slot.LookupWithPassword("maddsua", "test123"); err != nil {
+	if peer, err := slot.LookupWithPassword(nil, "maddsua", "test123"); err != nil {
 		t.Fatalf("LookupWithPassword: %v", err)
 	} else {
 		peer.DataReceived.Add(2000)
 		peer.DataSent.Add(1000)
 	}
 
-	if peer, err := slot.LookupWithPassword("notmaddsua", "00000000"); err != nil {
+	if peer, err := slot.LookupWithPassword(nil, "notmaddsua", "00000000"); err != nil {
 		t.Fatalf("LookupWithPassword: %v", err)
 	} else {
 		peer.DataReceived.Add(852000)

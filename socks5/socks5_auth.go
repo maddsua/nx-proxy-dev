@@ -110,7 +110,7 @@ func replyAuth(conn net.Conn, val AuthMethod) error {
 }
 
 // In accordance to https://datatracker.ietf.org/doc/html/rfc1929
-func connPasswordAuth(conn net.Conn, auth nxproxy.PasswordAuthenticator) (*nxproxy.Peer, error) {
+func connPasswordAuth(conn net.Conn, slot *nxproxy.Slot) (*nxproxy.Peer, error) {
 
 	if err := replyAuth(conn, AuthMethodPassword); err != nil {
 		return nil, fmt.Errorf("auth method ack: %v", err)
@@ -164,7 +164,9 @@ func connPasswordAuth(conn net.Conn, auth nxproxy.PasswordAuthenticator) (*nxpro
 		return nil, fmt.Errorf("invalid credentials: empty user name")
 	}
 
-	peer, err := auth.LookupWithPassword(creds.User, creds.Password)
+	remoteIp, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
+
+	peer, err := slot.LookupWithPassword(remoteIp, creds.User, creds.Password)
 	if err != nil {
 		_ = reply(PasswordAuthFail)
 		return nil, err

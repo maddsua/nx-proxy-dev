@@ -13,15 +13,9 @@ import (
 	"github.com/google/uuid"
 )
 
-//	todo: add some sort of rate limiting
-
 var ErrUserNotFound = errors.New("user not found")
 var ErrPasswordInvalid = errors.New("password invalid")
 var ErrSlotOptionsIncompatible = errors.New("slot options incompatible")
-
-type PasswordAuthenticator interface {
-	LookupWithPassword(username, password string) (*Peer, error)
-}
 
 type SlotService interface {
 	ID() uuid.UUID
@@ -59,6 +53,8 @@ type Slot struct {
 	SlotOptions
 
 	BaseContext context.Context
+	//	todo: set default values or something
+	Rl RateLimiter
 
 	deferredDeltas []PeerDelta
 
@@ -219,7 +215,13 @@ func (slot *Slot) Close() (err error) {
 	return
 }
 
-func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {
+func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Peer, error) {
+
+	rlc := slot.Rl.Get("pw:" + ip.String())
+
+	if err := rlc.Use(); err != nil {
+		return nil, err
+	}
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
@@ -255,6 +257,8 @@ func (slot *Slot) LookupWithPassword(username, password string) (*Peer, error) {
 	} else if !comparePasswords([]byte(pa.Password), []byte(password)) {
 		return nil, ErrPasswordInvalid
 	}
+
+	rlc.Reset()
 
 	return peer, nil
 }
