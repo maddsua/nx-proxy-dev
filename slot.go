@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -169,7 +171,17 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			slot.deferPeerDelta(peer)
 		}
 
-		newPeerMap[entry.ID] = &Peer{PeerOptions: entry, BaseContext: slot.BaseContext}
+		newPeerMap[entry.ID] = &Peer{
+			PeerOptions: entry,
+			BaseContext: slot.BaseContext,
+			Dialer: net.Dialer{
+				//	todo: set local address when specified
+				//	todo: set dns resolver when specified
+
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			},
+		}
 	}
 
 	//	remove old peers

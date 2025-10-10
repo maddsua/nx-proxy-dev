@@ -236,10 +236,7 @@ func (svc *service) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAd
 
 	defer connCtl.Close()
 
-	//	todo: insert framed ip and dns
-	dialer := nxproxy.NewTcpDialer(nil, nil)
-
-	dstConn, err := dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
+	dstConn, err := peer.Dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
 	if err != nil {
 
 		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())

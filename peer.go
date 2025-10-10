@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,7 @@ type Peer struct {
 	PeerOptions
 
 	BaseContext context.Context
+	Dialer      net.Dialer
 
 	DataReceived atomic.Uint64
 	DataSent     atomic.Uint64
