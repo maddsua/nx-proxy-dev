@@ -97,7 +97,9 @@ func main() {
 				slog.Int("deltas", len(metrics.Deltas)))
 		}
 
-		ticker := time.NewTicker(30 * time.Second)
+		doUpdate()
+
+		ticker := time.NewTicker(time.Minute)
 
 		for {
 			select {
@@ -134,13 +136,13 @@ func main() {
 
 		ticker := time.NewTicker(15 * time.Second)
 
-		for {
+		pullConfig()
 
-			pullConfig()
+		for {
 
 			select {
 			case <-ticker.C:
-				continue
+				pullConfig()
 			case <-doneCh:
 				return
 			}
