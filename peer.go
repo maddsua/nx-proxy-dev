@@ -16,11 +16,11 @@ import (
 var ErrTooManyConnections = errors.New("too many connections")
 
 type PeerOptions struct {
-	ID             uuid.UUID         `json:"id"`
-	PasswordAuth   *PeerPasswordAuth `json:"password_auth"`
-	MaxConnections uint              `json:"max_connections"`
-	Bandwidth      PeerBandwidth     `json:"bandwidth"`
-	FramedIP       string            `json:"framed_ip"`
+	ID             uuid.UUID     `json:"id"`
+	PasswordAuth   *UserPassword `json:"password_auth"`
+	MaxConnections uint          `json:"max_connections"`
+	Bandwidth      PeerBandwidth `json:"bandwidth"`
+	FramedIP       string        `json:"framed_ip"`
 }
 
 type PeerDelta struct {
@@ -32,7 +32,7 @@ type PeerDelta struct {
 func (peer *PeerOptions) Fingerprint() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
-		return fmt.Sprintf("%v:pass:%s", peer.ID, auth.UserName)
+		return fmt.Sprintf("%v:pass:%s", peer.ID, auth.User)
 	}
 
 	return "<nil>"
@@ -41,7 +41,7 @@ func (peer *PeerOptions) Fingerprint() string {
 func (peer *PeerOptions) CmpCredentials(other PeerOptions) bool {
 
 	if auth := peer.PasswordAuth; auth != nil && other.PasswordAuth != nil {
-		return auth.UserName == other.PasswordAuth.UserName &&
+		return auth.User == other.PasswordAuth.User &&
 			auth.Password == other.PasswordAuth.Password
 	}
 
@@ -51,14 +51,14 @@ func (peer *PeerOptions) CmpCredentials(other PeerOptions) bool {
 func (peer *PeerOptions) DisplayName() string {
 
 	if auth := peer.PasswordAuth; auth != nil {
-		return auth.UserName
+		return auth.User
 	}
 
 	return peer.ID.String()
 }
 
-type PeerPasswordAuth struct {
-	UserName string `json:"username"`
+type UserPassword struct {
+	User     string `json:"user"`
 	Password string `json:"password"`
 }
 

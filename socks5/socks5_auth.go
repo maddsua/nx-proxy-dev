@@ -101,10 +101,6 @@ const (
 	PasswordAuthFail    = PasswordAuthStatus(0x01)
 )
 
-type UserPassword struct {
-	User, Password string
-}
-
 func replyAuth(conn net.Conn, val AuthMethod) error {
 	return reply(conn, Reply(val), nil)
 }
@@ -121,7 +117,7 @@ func connPasswordAuth(conn net.Conn, slot *nxproxy.Slot) (*nxproxy.Peer, error) 
 		return err
 	}
 
-	var readCredentials = func() (*UserPassword, error) {
+	var readCredentials = func() (*nxproxy.UserPassword, error) {
 
 		buff, err := nxproxy.ReadN(conn, 2)
 		if err != nil {
@@ -146,7 +142,7 @@ func connPasswordAuth(conn net.Conn, slot *nxproxy.Slot) (*nxproxy.Peer, error) 
 			return nil, err
 		}
 
-		return &UserPassword{
+		return &nxproxy.UserPassword{
 			User:     string(username),
 			Password: string(password),
 		}, nil

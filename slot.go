@@ -137,10 +137,10 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			return fmt.Errorf("no auth properties are set")
 		}
 
-		if _, has := importedUsernameSet[peer.PasswordAuth.UserName]; has {
-			return fmt.Errorf("password auth: user name not unique: %s", peer.PasswordAuth.UserName)
+		if _, has := importedUsernameSet[peer.PasswordAuth.User]; has {
+			return fmt.Errorf("password auth: user name not unique: %s", peer.PasswordAuth.User)
 		} else {
-			importedUsernameSet[peer.PasswordAuth.UserName] = struct{}{}
+			importedUsernameSet[peer.PasswordAuth.User] = struct{}{}
 		}
 
 		return nil
@@ -252,7 +252,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	newUserNameMap := map[string]*Peer{}
 	for _, peer := range newPeerMap {
 		if auth := peer.PeerOptions.PasswordAuth; auth != nil {
-			newUserNameMap[auth.UserName] = peer
+			newUserNameMap[auth.User] = peer
 		}
 	}
 

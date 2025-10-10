@@ -55,8 +55,8 @@ func main() {
 			for _, entry := range entry.Peers {
 				peers = append(peers, nxproxy.PeerOptions{
 					ID: entry.ID,
-					PasswordAuth: &nxproxy.PeerPasswordAuth{
-						UserName: entry.UserName,
+					PasswordAuth: &nxproxy.UserPassword{
+						User:     entry.UserName,
 						Password: entry.Password,
 					},
 					MaxConnections: entry.MaxConnections,
