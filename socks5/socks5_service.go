@@ -18,6 +18,9 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 	svc := service{
 		Slot: nxproxy.Slot{
 			SlotOptions: opts,
+			Rl: &nxproxy.RateLimiter{
+				RateLimiterOptions: nxproxy.DefaultRatelimiter,
+			},
 		},
 	}
 

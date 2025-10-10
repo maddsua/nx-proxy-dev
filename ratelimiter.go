@@ -9,6 +9,11 @@ import (
 
 var ErrRateLimited = errors.New("rate limited")
 
+var DefaultRatelimiter = RateLimiterOptions{
+	Quota:  50,
+	Window: 5 * time.Minute,
+}
+
 type RlCounter struct {
 	init    int64
 	quota   atomic.Int64
@@ -37,9 +42,13 @@ func (rlc *RlCounter) Use() error {
 	return nil
 }
 
-type RateLimiter struct {
+type RateLimiterOptions struct {
 	Quota  int64
 	Window time.Duration
+}
+
+type RateLimiter struct {
+	RateLimiterOptions
 
 	entries          map[string]*RlCounter
 	mtx              sync.Mutex
