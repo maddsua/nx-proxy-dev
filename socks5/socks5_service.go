@@ -101,12 +101,12 @@ func (svc *service) acceptConns() {
 			continue
 
 		} else {
-			go svc.handleConn(next)
+			go svc.serveConn(next)
 		}
 	}
 }
 
-func (svc *service) handleConn(conn net.Conn) {
+func (svc *service) serveConn(conn net.Conn) {
 
 	defer func() {
 
@@ -194,7 +194,7 @@ func (svc *service) handleConn(conn net.Conn) {
 
 	switch req.Cmd {
 	case CmdConnect:
-		svc.handleCmdConnect(conn, peer, req.Addr)
+		svc.cmdConnect(conn, peer, req.Addr)
 	default:
 
 		client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
@@ -209,7 +209,7 @@ func (svc *service) handleConn(conn net.Conn) {
 	}
 }
 
-func (svc *service) handleCmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
+func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
 
 	connCtl, err := peer.Connection()
 	if err != nil {
