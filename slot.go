@@ -91,8 +91,8 @@ func (slot *Slot) Deltas() []SlotDelta {
 			entry = &delta
 			peerMap[delta.PeerID] = entry
 		} else {
-			entry.DataReceived += delta.DataReceived
-			entry.DataSent += delta.DataSent
+			entry.Rx += delta.Rx
+			entry.Tx += delta.Tx
 		}
 	}
 
@@ -275,6 +275,6 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 }
 
 type SlotDelta struct {
-	SlotID uuid.UUID `json:"slot_id"`
+	SlotID uuid.UUID `json:"slot"`
 	PeerDelta
 }

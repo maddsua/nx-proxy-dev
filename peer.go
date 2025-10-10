@@ -316,8 +316,8 @@ func (peer *Peer) Deltas() (PeerDelta, bool) {
 		return PeerDelta{
 			PeerID: peer.ID,
 
-			DataReceived: rx,
-			DataSent:     tx,
+			Rx: rx,
+			Tx: tx,
 		}, true
 	}
 
@@ -325,9 +325,9 @@ func (peer *Peer) Deltas() (PeerDelta, bool) {
 }
 
 type PeerDelta struct {
-	PeerID       uuid.UUID `json:"peer_id"`
-	DataReceived uint64    `json:"data_received"`
-	DataSent     uint64    `json:"data_sent"`
+	PeerID uuid.UUID `json:"peer"`
+	Rx     uint64    `json:"rx"`
+	Tx     uint64    `json:"tx"`
 }
 
 type PeerConnection struct {

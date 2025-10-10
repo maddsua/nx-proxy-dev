@@ -138,10 +138,10 @@ func TestSlotDeltas(t *testing.T) {
 			t.Errorf("unexpected PeerID: %v", entry.PeerID)
 		}
 
-		if entry.DataReceived != uint64(expectReceived) {
-			t.Errorf("unexpected 'DataReceived' of '%v': %d", entry.PeerID, entry.DataReceived)
-		} else if entry.DataSent != uint64(expectSent) {
-			t.Errorf("unexpected 'DataSent' of '%v': %d", entry.PeerID, entry.DataReceived)
+		if entry.Rx != uint64(expectReceived) {
+			t.Errorf("unexpected 'DataReceived' of '%v': %d", entry.PeerID, entry.Rx)
+		} else if entry.Tx != uint64(expectSent) {
+			t.Errorf("unexpected 'DataSent' of '%v': %d", entry.PeerID, entry.Rx)
 		}
 	}
 }
