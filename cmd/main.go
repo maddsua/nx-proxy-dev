@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -109,25 +110,25 @@ func main() {
 		defer wg.Done()
 		defer slog.Debug("Routine: API: PullTable: Exited")
 
-		var pullTable = func() {
+		var pullConfig = func() {
 
-			table, err := client.PullConfig()
+			cfg, err := client.PullConfig()
 			if err != nil {
-				slog.Error("API: PullTable",
+				slog.Error("API: PullConfig",
 					slog.String("err", err.Error()))
 				return
 			}
 
-			slog.Debug("API: PullTable OK")
+			slog.Debug("API: PullConfig OK")
 
-			hub.ImportServices(table.Services)
+			hub.SetConfig(cfg)
 		}
 
 		ticker := time.NewTicker(15 * time.Second)
 
 		for {
 
-			pullTable()
+			pullConfig()
 
 			select {
 			case <-ticker.C:
@@ -152,4 +153,17 @@ func main() {
 	wg.Wait()
 
 	slog.Warn("Service stopped. Bye-Bye...")
+}
+
+type dnsProvider struct {
+	resolver *net.Resolver
+	addr     string
+}
+
+func (prov *dnsProvider) Addr() string {
+	return prov.addr
+}
+
+func (prov *dnsProvider) Resolver() *net.Resolver {
+	return prov.resolver
 }

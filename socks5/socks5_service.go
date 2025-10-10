@@ -13,7 +13,7 @@ import (
 	nxproxy "github.com/maddsua/nx-proxy"
 )
 
-func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
+func NewService(opts nxproxy.SlotOptions, dns nxproxy.DnsProvider) (nxproxy.SlotService, error) {
 
 	svc := service{
 		Slot: nxproxy.Slot{
@@ -21,6 +21,7 @@ func NewService(opts nxproxy.SlotOptions) (nxproxy.SlotService, error) {
 			Rl: &nxproxy.RateLimiter{
 				RateLimiterOptions: nxproxy.DefaultRatelimiter,
 			},
+			DNS: dns,
 		},
 	}
 

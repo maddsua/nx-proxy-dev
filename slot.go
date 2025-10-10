@@ -55,7 +55,7 @@ type Slot struct {
 
 	BaseContext context.Context
 	Rl          *RateLimiter
-	DnsResolver *net.Resolver
+	DNS         DnsProvider
 
 	deferredDeltas []PeerDelta
 
@@ -173,7 +173,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			BaseContext: slot.BaseContext,
 			Dialer: net.Dialer{
 
-				Resolver: slot.DnsResolver,
+				Resolver: slot.DNS.Resolver(),
 				//	todo: set local address when specified
 
 				Timeout:   30 * time.Second,

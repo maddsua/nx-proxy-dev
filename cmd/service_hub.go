@@ -9,16 +9,43 @@ import (
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
 
+	"github.com/maddsua/nx-proxy/rest/model"
 	socksv5 "github.com/maddsua/nx-proxy/socks5"
 )
 
 type ServiceHub struct {
+	dns            dnsProvider
 	bindMap        map[string]nxproxy.SlotService
 	mtx            sync.Mutex
 	deferredDeltas []nxproxy.SlotDelta
 }
 
-func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
+func (hub *ServiceHub) SetConfig(cfg *model.FullConfig) {
+	hub.SetDns(cfg.DNS)
+	hub.SetServices(cfg.Services)
+}
+
+func (hub *ServiceHub) SetDns(addr string) {
+
+	if addr == "" {
+		hub.dns.resolver = nil
+		hub.dns.addr = ""
+		return
+	}
+
+	resolver, err := nxproxy.NewDnsResolver(addr)
+	if err != nil {
+		slog.Error("ServiceHub: SetDns: NewDnsResolver",
+			slog.String("addr", addr),
+			slog.String("err", err.Error()))
+		return
+	}
+
+	hub.dns.resolver = resolver
+	hub.dns.addr = addr
+}
+
+func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
@@ -99,7 +126,7 @@ func (hub *ServiceHub) ImportServices(entries []nxproxy.ServiceOptions) {
 
 		switch entry.Slot.Proto {
 		case nxproxy.ProxyProtoSocks:
-			if slot, err = socksv5.NewService(entry.Slot); err != nil {
+			if slot, err = socksv5.NewService(entry.Slot, &hub.dns); err != nil {
 				slog.Error("ServiceHub: Create slot: Socks5",
 					slog.String("id", slot.ID().String()),
 					slog.String("err", err.Error()))

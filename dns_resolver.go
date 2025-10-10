@@ -1,4 +1,4 @@
-package dns
+package nxproxy
 
 import (
 	"context"
@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-func NewResolver(addr string) (*net.Resolver, error) {
+type DnsProvider interface {
+	Resolver() *net.Resolver
+}
+
+func NewDnsResolver(addr string) (*net.Resolver, error) {
 
 	const defaultTimeout = 10 * time.Second
 
