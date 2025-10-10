@@ -75,8 +75,8 @@ type Peer struct {
 	BaseContext context.Context
 	Dialer      net.Dialer
 
-	DataReceived atomic.Uint64
-	DataSent     atomic.Uint64
+	DeltaRx atomic.Uint64
+	DeltaTx atomic.Uint64
 
 	nextConnID    uint64
 	connMap       map[uint64]*PeerConnection
@@ -180,8 +180,8 @@ func (peer *Peer) refresh() {
 			if conn.ctx.Err() != nil {
 
 				//	copy data volume back to the peer
-				peer.DataReceived.Add(conn.deltaRx.Load())
-				peer.DataSent.Add(conn.deltaTx.Load())
+				peer.DeltaRx.Add(conn.deltaRx.Load())
+				peer.DeltaTx.Add(conn.deltaTx.Load())
 
 				//	and nuke the connection entirely
 				delete(peer.connMap, key)
@@ -196,8 +196,8 @@ func (peer *Peer) refresh() {
 
 	var slurpDeltas = func(entries []*PeerConnection) {
 		for _, conn := range entries {
-			peer.DataReceived.Add(conn.deltaRx.Swap(0))
-			peer.DataSent.Add(conn.deltaTx.Swap(0))
+			peer.DeltaRx.Add(conn.deltaRx.Swap(0))
+			peer.DeltaTx.Add(conn.deltaTx.Swap(0))
 		}
 	}
 
@@ -243,8 +243,8 @@ func (peer *Peer) CloseConnections() {
 
 		conn.Close()
 
-		peer.DataReceived.Add(conn.deltaRx.Load())
-		peer.DataSent.Add(conn.deltaTx.Load())
+		peer.DeltaRx.Add(conn.deltaRx.Load())
+		peer.DeltaTx.Add(conn.deltaTx.Load())
 
 		delete(peer.connMap, key)
 	}
@@ -252,8 +252,8 @@ func (peer *Peer) CloseConnections() {
 
 func (peer *Peer) Delta() (PeerDelta, bool) {
 
-	rx := peer.DataReceived.Swap(0)
-	tx := peer.DataSent.Swap(0)
+	rx := peer.DeltaRx.Swap(0)
+	tx := peer.DeltaTx.Swap(0)
 
 	if rx > 0 || tx > 0 {
 		return PeerDelta{
