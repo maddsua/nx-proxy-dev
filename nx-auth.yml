@@ -4,4 +4,11 @@ proxy:
     - id: 5460e1ab-0383-4740-95b8-2ddffc35c41d
       proto: socks
       bind_addr: 127.0.0.1:1080
+      peers:
+        - id: 29f657a5-f065-4963-831f-70b0f22bd9f2
+          username: maddsua
+          password: JuPTAg2ors3Z8Ybn7pGmDin8J6ZTHjCA
+          max_connections: 64
+          rx_rate: 50000
+          tx_rate: 50000
   dns: 1.1.1.1
