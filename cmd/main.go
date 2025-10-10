@@ -93,7 +93,8 @@ func main() {
 			retryQueue = nil
 
 			slog.Debug("API: Metrics sent",
-				slog.String("remote", client.URL.Host))
+				slog.String("remote", client.URL.Host),
+				slog.Int("deltas", len(metrics.Deltas)))
 		}
 
 		ticker := time.NewTicker(30 * time.Second)
