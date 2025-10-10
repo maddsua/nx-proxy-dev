@@ -40,7 +40,7 @@ const (
 )
 
 type ServiceOptions struct {
-	Slot  SlotOptions   `json:"slot"`
+	SlotOptions
 	Peers []PeerOptions `json:"peers"`
 }
 

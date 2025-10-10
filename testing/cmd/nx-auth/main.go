@@ -62,7 +62,7 @@ func main() {
 
 			services = append(services, nxproxy.ServiceOptions{
 				Peers: peers,
-				Slot: nxproxy.SlotOptions{
+				SlotOptions: nxproxy.SlotOptions{
 					ID:       entry.ID,
 					Proto:    nxproxy.ProxyProto(entry.Proto),
 					BindAddr: entry.BindAddr,

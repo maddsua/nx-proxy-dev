@@ -79,24 +79,24 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 	for _, entry := range entries {
 
-		if err := slotOptsValid(&entry.Slot); err != nil {
+		if err := slotOptsValid(&entry.SlotOptions); err != nil {
 			slog.Warn("Service: Import slot: Entry invalid; Skipped",
-				slog.String("slot_id", entry.Slot.ID.String()),
+				slog.String("slot_id", entry.ID.String()),
 				slog.String("err", err.Error()))
 			continue
 		}
 
-		bindAddr, err := nxproxy.ServiceBindAddr(entry.Slot.BindAddr, entry.Slot.Proto)
+		bindAddr, err := nxproxy.ServiceBindAddr(entry.BindAddr, entry.Proto)
 		if err != nil {
 			slog.Error("ServiceHub: ServiceBindAddr invalid",
-				slog.String("val", entry.Slot.BindAddr),
+				slog.String("val", entry.BindAddr),
 				slog.String("err", err.Error()))
 			continue
 		}
 
 		if slot, has := hub.bindMap[bindAddr]; has {
 
-			if err := slot.SetOptions(entry.Slot); err == nil {
+			if err := slot.SetOptions(entry.SlotOptions); err == nil {
 
 				slot.SetPeers(entry.Peers)
 
@@ -124,9 +124,9 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 		var slot nxproxy.SlotService
 
-		switch entry.Slot.Proto {
+		switch entry.Proto {
 		case nxproxy.ProxyProtoSocks:
-			if slot, err = socksv5.NewService(entry.Slot, &hub.dns); err != nil {
+			if slot, err = socksv5.NewService(entry.SlotOptions, &hub.dns); err != nil {
 				slog.Error("ServiceHub: Create slot: Socks5",
 					slog.String("id", slot.ID().String()),
 					slog.String("err", err.Error()))
@@ -134,8 +134,8 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 			}
 		default:
 			slog.Error("ServiceHub: Create slot: Unsupported service protocol",
-				slog.String("id", entry.Slot.ID.String()),
-				slog.String("proto", string(entry.Slot.Proto)))
+				slog.String("id", entry.ID.String()),
+				slog.String("proto", string(entry.Proto)))
 			continue
 		}
 
