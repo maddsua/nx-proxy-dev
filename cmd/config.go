@@ -11,9 +11,9 @@ type ConfigEntries map[string]string
 func LoadConfigFile() ConfigEntries {
 
 	entries := []string{
-		"/etc/nx-proxy.conf",
-		"/opt/nx-proxy.conf",
-		"~/nx-proxy/service.conf",
+		"/etc/nx-proxy/nx-proxy.conf",
+		"/opt/nx-proxy/nx-proxy.conf",
+		"~/nx-proxy/nx-proxy.conf",
 		"~/nx-proxy.conf",
 		"./nx-proxy.conf",
 	}
