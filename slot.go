@@ -2,6 +2,7 @@ package nxproxy
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -238,26 +239,13 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 		return nil, ErrUserNotFound
 	}
 
-	var comparePasswords = func(want, have []byte) bool {
-
-		if len(want) != len(have) {
-			return false
-		}
-
-		var fail bool
-
-		for idx, val := range want {
-			if have[idx] != val {
-				fail = true
-			}
-		}
-
-		return !fail
+	var comparePasswords = func(want, have string) bool {
+		return subtle.ConstantTimeCompare([]byte(want), []byte(have)) == 1
 	}
 
 	if pa := peer.PasswordAuth; pa == nil {
 		return nil, ErrPasswordInvalid
-	} else if !comparePasswords([]byte(pa.Password), []byte(password)) {
+	} else if !comparePasswords(pa.Password, password) {
 		return nil, ErrPasswordInvalid
 	}
 
