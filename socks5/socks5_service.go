@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"runtime/debug"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,14 +120,13 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-	client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-	host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+	clientIP, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
 
 	methods, err := readAuthMethods(conn)
 	if err != nil {
 		slog.Debug("SOCKS5: Handshake error",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("err", err.Error()))
 		_ = reply(conn, ReplyErrGeneric, nil)
 		return
@@ -140,8 +138,8 @@ func (svc *service) serveConn(conn net.Conn) {
 
 		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
 			slog.Debug("SOCKS5: Password auth: Failed",
-				slog.String("client_ip", client_ip.String()),
-				slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+				slog.String("client_ip", clientIP.String()),
+				slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 				slog.String("err", err.Error()))
 			return
 		}
@@ -154,8 +152,8 @@ func (svc *service) serveConn(conn net.Conn) {
 	req, err := readRequest(conn)
 	if err != nil {
 		slog.Debug("SOCKS5: Invalid request",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("err", err.Error()))
 		_ = reply(conn, ReplyErrGeneric, nil)
 		return
@@ -163,8 +161,8 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		slog.Debug("SOCKS5: Reset io timeouts",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("err", err.Error()))
 		_ = reply(conn, ReplyErrGeneric, nil)
 		return
@@ -172,8 +170,8 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	if nxproxy.IsLocalAddress(req.Addr.Host) {
 		slog.Warn("SOCKS5: Dest addr not allowed",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("dst", req.Addr.String()))
 		_ = reply(conn, ReplyErrConnNotAllowedByRuleset, nil)
 		return
@@ -184,8 +182,8 @@ func (svc *service) serveConn(conn net.Conn) {
 		svc.cmdConnect(conn, peer, req.Addr)
 	default:
 		slog.Debug("SOCKS5: Command not supported",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("cmd", req.Cmd.String()))
 		_ = reply(conn, ReplyErrCmdNotSupported, nil)
 	}
@@ -193,15 +191,14 @@ func (svc *service) serveConn(conn net.Conn) {
 
 func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
 
-	client_ip, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
-	host_ip, host_port := nxproxy.GetAddrPort(conn.LocalAddr())
+	clientIP, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
 
 	connCtl, err := peer.Connection()
 	if err != nil {
 
 		slog.Debug("SOCKS5: Connect: Peer connection rejected",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("err", err.Error()))
 
@@ -219,8 +216,8 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 	dstConn, err := peer.Dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
 	if err != nil {
 		slog.Debug("SOCKSv5: Connect: Unable to dial destination",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("remote", remoteAddr.Host),
 			slog.String("err", err.Error()))
@@ -232,8 +229,8 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 
 	if err := reply(conn, ReplyOk, remoteAddr); err != nil {
 		slog.Debug("SOCKSv5: Connect: Ack failed",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("remote", remoteAddr.Host),
 			slog.String("err", err.Error()))
@@ -241,15 +238,15 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 	}
 
 	slog.Debug("SOCKSv5: Connect",
-		slog.String("client_ip", client_ip.String()),
-		slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+		slog.String("client_ip", clientIP.String()),
+		slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 		slog.String("peer", peer.DisplayName()),
 		slog.String("remote", remoteAddr.Host))
 
 	if err := nxproxy.ProxyBridge(connCtl, conn, dstConn); err != nil {
 		slog.Debug("SOCKSv5: Connect: Broken pipe",
-			slog.String("client_ip", client_ip.String()),
-			slog.String("proxy_addr", net.JoinHostPort(host_ip.String(), strconv.Itoa(host_port))),
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
 			slog.String("remote", remoteAddr.Host),
 			slog.String("err", err.Error()))
