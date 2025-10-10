@@ -5,8 +5,9 @@ import (
 	nxproxy "github.com/maddsua/nx-proxy"
 )
 
-type ProxyTable struct {
+type FullConfig struct {
 	Services []nxproxy.ServiceOptions `json:"services"`
+	DNS      string                   `json:"dns"`
 }
 
 type Metrics struct {

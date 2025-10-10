@@ -111,7 +111,7 @@ func main() {
 
 		var pullTable = func() {
 
-			table, err := client.PullTable()
+			table, err := client.PullConfig()
 			if err != nil {
 				slog.Error("API: PullTable",
 					slog.String("err", err.Error()))

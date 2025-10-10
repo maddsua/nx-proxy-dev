@@ -55,6 +55,7 @@ type Slot struct {
 
 	BaseContext context.Context
 	Rl          *RateLimiter
+	DnsResolver *net.Resolver
 
 	deferredDeltas []PeerDelta
 
@@ -167,17 +168,20 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			slot.deferPeerDelta(peer)
 		}
 
-		newPeerMap[entry.ID] = &Peer{
+		peer := Peer{
 			PeerOptions: entry,
 			BaseContext: slot.BaseContext,
 			Dialer: net.Dialer{
+
+				Resolver: slot.DnsResolver,
 				//	todo: set local address when specified
-				//	todo: set dns resolver when specified
 
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
 			},
 		}
+
+		newPeerMap[entry.ID] = &peer
 	}
 
 	//	remove old peers

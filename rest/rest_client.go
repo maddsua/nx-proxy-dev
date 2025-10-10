@@ -17,6 +17,6 @@ func (client *Client) PostMetrics(metrics *model.Metrics) error {
 	return beacon(client.URL, client.Token, http.MethodPost, "/metrics", metrics)
 }
 
-func (client *Client) PullTable() (*model.ProxyTable, error) {
-	return fetch[model.ProxyTable](client.URL, client.Token, http.MethodGet, "/table", nil)
+func (client *Client) PullConfig() (*model.FullConfig, error) {
+	return fetch[model.FullConfig](client.URL, client.Token, http.MethodGet, "/config", nil)
 }
