@@ -25,7 +25,7 @@ func NewService(opts nxproxy.SlotOptions, dns nxproxy.DnsProvider) (nxproxy.Slot
 
 	listener, err := net.Listen(proto, addr)
 	if err != nil {
-		return nil, fmt.Errorf("listen: %v", err)
+		return nil, err
 	}
 
 	svc.srv.Addr = addr

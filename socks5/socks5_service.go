@@ -28,7 +28,7 @@ func NewService(opts nxproxy.SlotOptions, dns nxproxy.DnsProvider) (nxproxy.Slot
 	addr, proto, _ := nxproxy.SplitAddrNet(opts.BindAddr)
 
 	if svc.listener, err = net.Listen(proto, addr); err != nil {
-		return nil, fmt.Errorf("listen: %v", err)
+		return nil, err
 	}
 
 	svc.ctx, svc.cancelFn = context.WithCancel(context.Background())
