@@ -1,0 +1,282 @@
+openapi: 3.0.4
+info:
+  title: NX-Proxy REST API
+  description: These are the endpoints that your backend must implement
+  version: 1.0.0
+servers:
+  - url: https://<proxies.yourdomain>/nxproxy/v1
+  - url: https://<proxies.yourdomain>/api/rest/nxproxy/v1
+  - url: https://<proxies.yourdomain>/api/rest/v1/nxproxy/v1
+tags:
+  - name: config
+    description: Configuration and proxy tables
+  - name: status
+    description: Status reporting
+paths:
+  /config:
+    get:
+      tags:
+        - config
+      summary: Get full service configuration
+      description: Must return the full config object including all slots and peers
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FullConfig'
+        401:
+          description: No auth token provided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+        403:
+          description: Auth token invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+        500:
+          description: Something is broken on the backend
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+  /status:
+    post:
+      tags:
+        - status
+      summary: Reports service status
+      description: Sends diagnostic information back to the auth server, reporting service health and active services
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Status'
+      responses:
+        204:
+          description: Successful operation
+        401:
+          description: No auth token provided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+        403:
+          description: Auth token invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+        500:
+          description: Something is broken on the backend
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/APIError'
+components:
+  schemas:
+    APIError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+    FullConfig:
+      type: object
+      properties:
+        services:
+          type: array
+          description: List of active services
+          items:
+            $ref: '#/components/schemas/ServiceOptions'
+        dns:
+          type: string
+          description: DNS server address
+          example: 1.1.1.1
+    ServiceOptions:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique slot UUID
+          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
+        proto:
+          type: string
+          description: Slot service type
+          enum:
+            - socks
+            - http
+        bind_addr:
+          type: string
+          description: Slot service bind address
+          example: 127.0.0.1:1080
+        peers:
+          type: array
+          description: List of active slot peers
+          items:
+            $ref: '#/components/schemas/PeerOptions'
+    PeerOptions:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique peer UUID
+          example: 9bad1601-7463-493d-986e-3f049e4043a4
+        password_auth:
+          allOf:
+            - $ref: '#/components/schemas/UserPassword'
+          description: Defines password auth for this peer
+          nullable: true
+        max_connections:
+          type: integer
+          description: Max number of concurrent connections
+          example: 128
+          nullable: true
+        bandwidth:
+          allOf:
+            - $ref: '#/components/schemas/PeerBandwidth'
+          description: Sets connection speed limits
+          nullable: true
+        framed_ip:
+          type: string
+          description: Public ip to use for outbound connections (must be assigned to the host, a default ip would be used otherwise)
+          example: 46.211.0.0
+        disabled:
+          type: boolean
+          description: Used to disable a peer without having to completely removing it
+          example: false
+    UserPassword:
+      type: object
+      properties:
+        user:
+          type: string
+          description: User's name
+          example: maddsua
+        password:
+          type: string
+          description: User's password
+          example: ilovecakes
+    PeerBandwidth:
+      type: object
+      properties:
+        rx:
+          type: integer
+          description: Total downstream connection bandwidth in bytes/s
+          example: 500000
+          nullable: true
+        tx:
+          type: integer
+          description: Total upstream connection bandwidth in bytes/s
+          example: 250000
+          nullable: true
+        min_rx:
+          type: integer
+          description: Minimal downstream connection speed in bytes/s
+          example: 100000
+          nullable: true
+        min_tx:
+          type: integer
+          description: Minimal upstream connection speed in bytes/s
+          example: 100000
+          nullable: true
+    Status:
+      type: object
+      properties:
+        service:
+          allOf:
+            - $ref: '#/components/schemas/ServiceInfo'
+          description: Service runtime info
+        deltas:
+          type: array
+          description: Data volume statistics
+          items:
+            $ref: '#/components/schemas/SlotDelta'
+        slots:
+          type: array
+          description: Active slot info
+          items:
+            $ref: '#/components/schemas/SlotInfo'
+    ServiceInfo:
+      type: object
+      properties:
+        run_id:
+          type: string
+          description: Unique run uuid
+          example: b0b49fe0-b4bc-4dc5-9416-abbf7978e42b
+        uptime:
+          type: integer
+          description: Service uptime in seconds
+          example: 69
+    SlotDelta:
+      type: object
+      properties:
+        slot:
+          type: string
+          description: Delta's slot UUID
+          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
+        peer:
+          type: string
+          description: Delta's peer UUID
+          example: 9bad1601-7463-493d-986e-3f049e4043a4
+        rx:
+          type: integer
+          description: Data received by the peer
+          example: 1000000000
+        tx:
+          type: integer
+          description: Data sent by the peer
+          example: 6900000
+    SlotInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique slot UUID
+          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
+        up:
+          type: boolean
+          description: A flag indicating whether the service is active
+          example: false
+        proto:
+          type: string
+          description: Slot service type
+          enum:
+            - socks
+            - http
+        bind_addr:
+          type: string
+          description: Slot service bind address
+          example: 127.0.0.1:1080
+        registered_peers:
+          type: integer
+          description: Number of active peers
+          example: 69
+        error:
+          type: string
+          description: Service error, if present
+          nullable: true
+          example: Yo, shit's fucked!
