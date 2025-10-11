@@ -13,8 +13,8 @@ type Client struct {
 	Token *nxproxy.ServerToken
 }
 
-func (client *Client) PostMetrics(metrics *model.Metrics) error {
-	return beacon(client.URL, client.Token, http.MethodPost, "/metrics", metrics)
+func (client *Client) PostStatus(status *model.Status) error {
+	return beacon(client.URL, client.Token, http.MethodPost, "/status", status)
 }
 
 func (client *Client) PullConfig() (*model.FullConfig, error) {

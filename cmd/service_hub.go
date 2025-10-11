@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"slices"
 	"sync"
 
 	"github.com/google/uuid"
@@ -15,10 +14,12 @@ import (
 )
 
 type ServiceHub struct {
-	dns            dnsProvider
-	bindMap        map[string]nxproxy.SlotService
-	mtx            sync.Mutex
-	deferredDeltas []nxproxy.SlotDelta
+	dns       dnsProvider
+	bindMap   map[string]nxproxy.SlotService
+	mtx       sync.Mutex
+	oldDeltas []nxproxy.SlotDelta
+	//	todo: use
+	errSlots []nxproxy.SlotInfo
 }
 
 func (hub *ServiceHub) SetConfig(cfg *model.FullConfig) {
@@ -105,22 +106,34 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				newBindMap[bindAddr] = slot
 				delete(hub.bindMap, bindAddr)
 
+				info := slot.Info()
+
 				slog.Debug("ServiceHub: Update slot",
-					slog.String("id", slot.ID().String()),
-					slog.String("proto", string(slot.Proto())),
-					slog.String("addr", slot.BindAddr()))
+					slog.String("id", info.ID.String()),
+					slog.String("proto", string(info.Proto)),
+					slog.String("addr", info.BindAddr))
 
 				continue
 			}
 
 			if err := slot.Close(); err != nil {
 				slog.Error("ServiceHub: Replace slot: Close outdated slot",
-					slog.String("id", slot.ID().String()),
+					slog.String("id", slot.Info().ID.String()),
 					slog.String("err", err.Error()))
 				continue
 			}
 
-			hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
+			hub.oldDeltas = append(hub.oldDeltas, slot.Deltas()...)
+		}
+
+		var storeSlotErr = func(err error) {
+			hub.errSlots = append(hub.errSlots, nxproxy.SlotInfo{
+				ID:       entry.ID,
+				Proto:    entry.Proto,
+				BindAddr: entry.BindAddr,
+				Up:       false,
+				Errror:   err.Error(),
+			})
 		}
 
 		var slot nxproxy.SlotService
@@ -132,6 +145,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				slog.Error("ServiceHub: Create slot: socks5",
 					slog.String("id", entry.ID.String()),
 					slog.String("err", err.Error()))
+				storeSlotErr(err)
 				continue
 			}
 
@@ -140,6 +154,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				slog.Error("ServiceHub: Create slot: http",
 					slog.String("id", entry.ID.String()),
 					slog.String("err", err.Error()))
+				storeSlotErr(err)
 				continue
 			}
 
@@ -147,21 +162,24 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 			slog.Error("ServiceHub: Create slot: Unsupported service protocol",
 				slog.String("id", entry.ID.String()),
 				slog.String("proto", string(entry.Proto)))
+			storeSlotErr(fmt.Errorf("unsupported protocol"))
 			continue
 		}
 
 		slot.SetPeers(entry.Peers)
 
+		info := slot.Info()
+
 		if _, has := hub.bindMap[bindAddr]; has {
 			slog.Info("ServiceHub: Replace slot",
-				slog.String("id", slot.ID().String()),
-				slog.String("type", string(slot.Proto())),
-				slog.String("addr", slot.BindAddr()))
+				slog.String("id", info.ID.String()),
+				slog.String("type", string(info.Proto)),
+				slog.String("addr", info.BindAddr))
 		} else {
 			slog.Info("ServiceHub: Create slot",
-				slog.String("id", slot.ID().String()),
-				slog.String("type", string(slot.Proto())),
-				slog.String("addr", slot.BindAddr()))
+				slog.String("id", info.ID.String()),
+				slog.String("type", string(info.Proto)),
+				slog.String("addr", info.BindAddr))
 		}
 
 		newBindMap[bindAddr] = slot
@@ -170,32 +188,37 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 	//	remove slot entries that weren't updated
 	for key, slot := range hub.bindMap {
 
+		info := slot.Info()
+
 		if err := slot.Close(); err != nil {
 
 			if newSlot, has := newBindMap[key]; has {
-				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
-					slog.String("old_id", slot.ID().String()),
-					slog.String("new_id", newSlot.ID().String()),
-					slog.String("err", err.Error()))
-				newBindMap[key] = slot
-			} else {
+
+				newInfo := newSlot.Info()
+
 				slog.Error("ServiceHub: Slot failed to terminate; Unable to overwrite a newer slot entry",
-					slog.String("old_id", slot.ID().String()),
-					slog.String("new_id", newSlot.ID().String()),
-					slog.String("type", string(slot.Proto())),
-					slog.String("addr", slot.BindAddr()),
+					slog.String("old_id", info.ID.String()),
+					slog.String("new_id", newInfo.ID.String()),
+					slog.String("type", string(info.Proto)),
+					slog.String("addr", info.BindAddr),
 					slog.String("err", err.Error()))
 				slog.Warn("ServiceHub: Possible service binding conflict")
+
+			} else {
+				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
+					slog.String("id", info.ID.String()),
+					slog.String("err", err.Error()))
+				newBindMap[key] = slot
 			}
 
 		} else {
 			slog.Info("ServiceHub: Remove slot",
-				slog.String("id", slot.ID().String()),
-				slog.String("type", string(slot.Proto())),
-				slog.String("addr", slot.BindAddr()))
+				slog.String("id", info.ID.String()),
+				slog.String("type", string(info.Proto)),
+				slog.String("addr", info.BindAddr))
 		}
 
-		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
+		hub.oldDeltas = append(hub.oldDeltas, slot.Deltas()...)
 
 		delete(hub.bindMap, key)
 	}
@@ -208,11 +231,26 @@ func (hub *ServiceHub) Deltas() []nxproxy.SlotDelta {
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
 
-	entries := slices.Clone(hub.deferredDeltas)
-	hub.deferredDeltas = nil
+	entries := hub.oldDeltas
+	hub.oldDeltas = nil
 
 	for _, slot := range hub.bindMap {
 		entries = append(entries, slot.Deltas()...)
+	}
+
+	return entries
+}
+
+func (hub *ServiceHub) SlotInfo() []nxproxy.SlotInfo {
+
+	hub.mtx.Lock()
+	defer hub.mtx.Unlock()
+
+	entries := hub.errSlots
+	hub.errSlots = nil
+
+	for _, slot := range hub.bindMap {
+		entries = append(entries, slot.Info())
 	}
 
 	return entries
@@ -223,22 +261,26 @@ func (hub *ServiceHub) CloseSlots() {
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
 
+	hub.errSlots = nil
+
 	for key, slot := range hub.bindMap {
+
+		info := slot.Info()
 
 		if err := slot.Close(); err != nil {
 			slog.Error("ServiceHub: Slot failed to terminate",
-				slog.String("id", slot.ID().String()),
-				slog.String("proto", string(slot.Proto())),
-				slog.String("addr", slot.BindAddr()),
+				slog.String("id", info.ID.String()),
+				slog.String("proto", string(info.Proto)),
+				slog.String("addr", info.BindAddr),
 				slog.String("err", err.Error()))
 		} else {
 			slog.Info("ServiceHub: Terminate slot",
-				slog.String("id", slot.ID().String()),
-				slog.String("proto", string(slot.Proto())),
-				slog.String("addr", slot.BindAddr()))
+				slog.String("id", info.ID.String()),
+				slog.String("proto", string(info.Proto)),
+				slog.String("addr", info.BindAddr))
 		}
 
-		hub.deferredDeltas = append(hub.deferredDeltas, slot.Deltas()...)
+		hub.oldDeltas = append(hub.oldDeltas, slot.Deltas()...)
 
 		delete(hub.bindMap, key)
 	}

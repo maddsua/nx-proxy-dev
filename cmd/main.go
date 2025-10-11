@@ -75,15 +75,16 @@ func main() {
 
 		var doUpdate = func() {
 
-			metrics := model.Metrics{
+			metrics := model.Status{
 				Deltas: append(retryQueue, hub.Deltas()...),
+				Slots:  hub.SlotInfo(),
 				Service: model.ServiceInfo{
 					RunID:  runID,
 					Uptime: int64(time.Since(runAt).Seconds()),
 				},
 			}
 
-			if err := client.PostMetrics(&metrics); err != nil {
+			if err := client.PostStatus(&metrics); err != nil {
 				slog.Error("API: PostMetrics",
 					slog.String("err", err.Error()))
 				retryQueue = metrics.Deltas

@@ -10,9 +10,10 @@ type FullConfig struct {
 	DNS      string                   `json:"dns"`
 }
 
-type Metrics struct {
+type Status struct {
 	Service ServiceInfo         `json:"service"`
 	Deltas  []nxproxy.SlotDelta `json:"deltas"`
+	Slots   []nxproxy.SlotInfo
 }
 
 type ServiceInfo struct {

@@ -17,9 +17,7 @@ import (
 var ErrSlotOptionsIncompatible = errors.New("slot options incompatible")
 
 type SlotService interface {
-	ID() uuid.UUID
-	Proto() ProxyProto
-	BindAddr() string
+	Info() SlotInfo
 	Deltas() []SlotDelta
 	SetPeers(entries []PeerOptions)
 	SetOptions(opts SlotOptions) error
@@ -57,6 +55,15 @@ type SlotDelta struct {
 	PeerDelta
 }
 
+type SlotInfo struct {
+	ID              uuid.UUID  `json:"id"`
+	Up              bool       `json:"up"`
+	Proto           ProxyProto `json:"proto"`
+	BindAddr        string     `json:"bind_addr"`
+	RegisteredPeers int        `json:"registered_peers"`
+	Errror          string     `json:"error"`
+}
+
 type Slot struct {
 	SlotOptions
 
@@ -69,6 +76,16 @@ type Slot struct {
 	peerMap     map[uuid.UUID]*Peer
 	userNameMap map[string]*Peer
 	mtx         sync.Mutex
+}
+
+func (slot *Slot) Info() SlotInfo {
+	return SlotInfo{
+		ID:              slot.ID,
+		Up:              true,
+		Proto:           slot.Proto,
+		BindAddr:        slot.BindAddr,
+		RegisteredPeers: len(slot.peerMap),
+	}
 }
 
 func (slot *Slot) Deltas() []SlotDelta {

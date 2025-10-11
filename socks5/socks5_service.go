@@ -8,7 +8,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
 )
 
@@ -47,18 +46,6 @@ type service struct {
 	ctx      context.Context
 	cancelFn context.CancelFunc
 	listener net.Listener
-}
-
-func (svc *service) ID() uuid.UUID {
-	return svc.SlotOptions.ID
-}
-
-func (svc *service) Proto() nxproxy.ProxyProto {
-	return svc.SlotOptions.Proto
-}
-
-func (svc *service) BindAddr() string {
-	return svc.SlotOptions.BindAddr
 }
 
 func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {

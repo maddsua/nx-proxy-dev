@@ -86,23 +86,31 @@ func main() {
 		})
 	}))
 
-	mux.Handle("POST /metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("POST /status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		defer w.WriteHeader(http.StatusNoContent)
 
-		var metrics model.Metrics
+		var status model.Status
 
-		if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-			slog.Error("Decode metrics",
+		if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
+			slog.Error("Decode status",
 				slog.String("err", err.Error()))
 			return
 		}
 
 		slog.Info("Uptime",
-			slog.String("run_id", metrics.Service.RunID.String()),
-			slog.Duration("t", time.Duration(metrics.Service.Uptime)*time.Second))
+			slog.String("run_id", status.Service.RunID.String()),
+			slog.Duration("t", time.Duration(status.Service.Uptime)*time.Second))
 
-		for _, delta := range metrics.Deltas {
+		for _, slot := range status.Slots {
+			slog.Info("Slot",
+				slog.String("id", slot.ID.String()),
+				slog.String("proto", string(slot.Proto)),
+				slog.String("addr", slot.BindAddr),
+				slog.Bool("up", slot.Up))
+		}
+
+		for _, delta := range status.Deltas {
 			slog.Info("Delta",
 				slog.String("peer", delta.PeerID.String()),
 				slog.Int("rx", int(delta.Rx)),
