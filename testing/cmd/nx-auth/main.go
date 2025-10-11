@@ -8,21 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	nxproxy "github.com/maddsua/nx-proxy"
 	"github.com/maddsua/nx-proxy/rest/model"
 )
 
 func main() {
-
-	fmt.Printf("\n----- WARNING -----\n\n")
-
-	fmt.Println("THIS PROGRAM IS INTENDED FOR DEVELOPMENT PURPOSES")
-	fmt.Println("AND UNDER ANY CIRCUMSTANCES SHOULD NOT BE EXPOSED")
-	fmt.Println("TO THE PUBLIC INTERNET IN ANY CAPACITY")
-
-	fmt.Printf("\n ----- \n\n")
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
@@ -98,24 +89,9 @@ func main() {
 			return
 		}
 
-		slog.Info("Uptime",
-			slog.String("run_id", status.Service.RunID.String()),
-			slog.Duration("t", time.Duration(status.Service.Uptime)*time.Second))
-
-		for _, slot := range status.Slots {
-			slog.Info("Slot",
-				slog.String("id", slot.ID.String()),
-				slog.String("proto", string(slot.Proto)),
-				slog.String("addr", slot.BindAddr),
-				slog.Bool("up", slot.Up))
-		}
-
-		for _, delta := range status.Deltas {
-			slog.Info("Delta",
-				slog.String("peer", delta.PeerID.String()),
-				slog.Int("rx", int(delta.Rx)),
-				slog.Int("tx", int(delta.Tx)))
-		}
+		data, _ := json.MarshalIndent(status, "", "  ")
+		slog.Info("Dumping status")
+		fmt.Print(string(data))
 	}))
 
 	srv := http.Server{
