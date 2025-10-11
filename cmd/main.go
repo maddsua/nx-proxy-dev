@@ -65,49 +65,68 @@ func main() {
 	runAt := time.Now()
 	doneCh := make(chan struct{})
 
+	var doConfigPull = func() {
+
+		cfg, err := client.PullConfig()
+		if err != nil {
+			slog.Error("API: Pulling config",
+				slog.String("err", err.Error()),
+				slog.String("remote", client.URL.Host))
+			return
+		}
+
+		slog.Debug("API: Updating config",
+			slog.String("remote", client.URL.Host))
+
+		hub.SetConfig(cfg)
+
+		slog.Debug("API: Config updated")
+	}
+
+	var deltasQueue []nxproxy.SlotDelta
+
+	var doStatusPush = func() {
+
+		metrics := model.Status{
+			Deltas: append(deltasQueue, hub.Deltas()...),
+			Slots:  hub.SlotInfo(),
+			Service: model.ServiceInfo{
+				RunID:  runID,
+				Uptime: int64(time.Since(runAt).Seconds()),
+			},
+		}
+
+		if err := client.PostStatus(&metrics); err != nil {
+			slog.Error("API: PostMetrics",
+				slog.String("err", err.Error()))
+			deltasQueue = metrics.Deltas
+			return
+		}
+
+		deltasQueue = nil
+
+		slog.Debug("API: Metrics sent",
+			slog.String("remote", client.URL.Host),
+			slog.Int("deltas", len(metrics.Deltas)))
+	}
+
+	doConfigPull()
+	doStatusPush()
+
 	wg.Add(2)
 
 	go func() {
 
-		var retryQueue []nxproxy.SlotDelta
-
 		defer wg.Done()
 
-		var doUpdate = func() {
-
-			metrics := model.Status{
-				Deltas: append(retryQueue, hub.Deltas()...),
-				Slots:  hub.SlotInfo(),
-				Service: model.ServiceInfo{
-					RunID:  runID,
-					Uptime: int64(time.Since(runAt).Seconds()),
-				},
-			}
-
-			if err := client.PostStatus(&metrics); err != nil {
-				slog.Error("API: PostMetrics",
-					slog.String("err", err.Error()))
-				retryQueue = metrics.Deltas
-				return
-			}
-
-			retryQueue = nil
-
-			slog.Debug("API: Metrics sent",
-				slog.String("remote", client.URL.Host),
-				slog.Int("deltas", len(metrics.Deltas)))
-		}
-
-		doUpdate()
-
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(15 * time.Second)
 
 		for {
+
 			select {
 			case <-ticker.C:
-				doUpdate()
+				doConfigPull()
 			case <-doneCh:
-				doUpdate()
 				return
 			}
 		}
@@ -117,34 +136,14 @@ func main() {
 
 		defer wg.Done()
 
-		var pullConfig = func() {
-
-			cfg, err := client.PullConfig()
-			if err != nil {
-				slog.Error("API: Pulling config",
-					slog.String("err", err.Error()),
-					slog.String("remote", client.URL.Host))
-				return
-			}
-
-			slog.Debug("API: Updating config",
-				slog.String("remote", client.URL.Host))
-
-			hub.SetConfig(cfg)
-
-			slog.Debug("API: Config updated")
-		}
-
-		ticker := time.NewTicker(15 * time.Second)
-
-		pullConfig()
+		ticker := time.NewTicker(10 * time.Second)
 
 		for {
-
 			select {
 			case <-ticker.C:
-				pullConfig()
+				doStatusPush()
 			case <-doneCh:
+				doStatusPush()
 				return
 			}
 		}
