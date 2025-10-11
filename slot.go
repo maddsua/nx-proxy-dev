@@ -202,6 +202,10 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				peer.PeerOptions = entry
 				peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
 
+				if peer.Disabled {
+					peer.CloseConnections()
+				}
+
 				if mustReauth {
 					slog.Debug("Peer credentials changed; Must reauthenticate",
 						slog.String("slot_id", slot.ID.String()),
