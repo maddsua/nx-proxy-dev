@@ -36,7 +36,7 @@ func (hub *ServiceHub) SetDns(addr string) {
 
 	resolver, err := nxproxy.NewDnsResolver(addr)
 	if err != nil {
-		slog.Error("ServiceHub: SetDns: NewDnsResolver",
+		slog.Error("SetDns: NewDnsResolver",
 			slog.String("addr", addr),
 			slog.String("err", err.Error()))
 		return
@@ -92,7 +92,8 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 		bindAddr, err := nxproxy.ServiceBindAddr(entry.BindAddr, entry.Proto)
 		if err != nil {
-			slog.Error("ServiceHub: ServiceBindAddr invalid",
+			slog.Error("ServiceBindAddr invalid",
+				slog.String("id", entry.ID.String()),
 				slog.String("val", entry.BindAddr),
 				slog.String("err", err.Error()))
 			continue
@@ -110,7 +111,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 				info := slot.Info()
 
-				slog.Debug("ServiceHub: Update slot",
+				slog.Debug("Update slot",
 					slog.String("id", info.ID.String()),
 					slog.String("proto", string(info.Proto)),
 					slog.String("addr", info.BindAddr))
@@ -119,7 +120,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 			}
 
 			if err := slot.Close(); err != nil {
-				slog.Error("ServiceHub: Replace slot: Close outdated slot",
+				slog.Error("Replace slot: Close outdated slot",
 					slog.String("id", slot.Info().ID.String()),
 					slog.String("err", err.Error()))
 				continue
@@ -149,10 +150,10 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 		}
 
 		if err != nil {
-			slog.Error("ServiceHub: Unable to create slot",
+			slog.Error("Unable to create slot",
 				slog.String("id", entry.ID.String()),
 				slog.String("proto", string(entry.Proto)),
-				slog.String("proto", string(entry.Proto)))
+				slog.String("bind_addr", entry.BindAddr))
 			storeSlotErr(err)
 			continue
 		}
@@ -162,12 +163,12 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 		info := slot.Info()
 
 		if _, has := hub.bindMap[bindAddr]; has {
-			slog.Info("ServiceHub: Replace slot",
+			slog.Info("Replace slot",
 				slog.String("id", info.ID.String()),
 				slog.String("type", string(info.Proto)),
 				slog.String("addr", info.BindAddr))
 		} else {
-			slog.Info("ServiceHub: Create slot",
+			slog.Info("Create slot",
 				slog.String("id", info.ID.String()),
 				slog.String("type", string(info.Proto)),
 				slog.String("addr", info.BindAddr))
@@ -187,23 +188,23 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 
 				newInfo := newSlot.Info()
 
-				slog.Error("ServiceHub: Slot failed to terminate; Unable to overwrite a newer slot entry",
+				slog.Error("Slot failed to terminate; Unable to overwrite a newer slot entry",
 					slog.String("old_id", info.ID.String()),
 					slog.String("new_id", newInfo.ID.String()),
 					slog.String("type", string(info.Proto)),
 					slog.String("addr", info.BindAddr),
 					slog.String("err", err.Error()))
-				slog.Warn("ServiceHub: Possible service binding conflict")
+				slog.Warn("Possible service binding conflict")
 
 			} else {
-				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
+				slog.Error("Slot failed to terminate; Keeping and retrying again",
 					slog.String("id", info.ID.String()),
 					slog.String("err", err.Error()))
 				newBindMap[key] = service
 			}
 
 		} else {
-			slog.Info("ServiceHub: Remove slot",
+			slog.Info("Remove slot",
 				slog.String("id", info.ID.String()),
 				slog.String("type", string(info.Proto)),
 				slog.String("addr", info.BindAddr))
@@ -259,13 +260,13 @@ func (hub *ServiceHub) CloseSlots() {
 		info := slot.Info()
 
 		if err := slot.Close(); err != nil {
-			slog.Error("ServiceHub: Slot failed to terminate",
+			slog.Error("Slot failed to terminate",
 				slog.String("id", info.ID.String()),
 				slog.String("proto", string(info.Proto)),
 				slog.String("addr", info.BindAddr),
 				slog.String("err", err.Error()))
 		} else {
-			slog.Info("ServiceHub: Terminate slot",
+			slog.Info("Terminate slot",
 				slog.String("id", info.ID.String()),
 				slog.String("proto", string(info.Proto)),
 				slog.String("addr", info.BindAddr))
