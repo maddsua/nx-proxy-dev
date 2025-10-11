@@ -34,6 +34,7 @@ type PeerConfig struct {
 	FramedIP       string    `yaml:"framed_ip"`
 	RxRate         uint32    `yaml:"rx_rate"`
 	TxRate         uint32    `yaml:"tx_rate"`
+	Disabled       bool      `yaml:"disabled"`
 }
 
 func FindConfigLocation() string {

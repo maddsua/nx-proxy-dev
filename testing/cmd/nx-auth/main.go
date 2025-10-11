@@ -63,6 +63,7 @@ func main() {
 							Rx: entry.RxRate,
 							Tx: entry.TxRate,
 						},
+						Disabled: entry.Disabled,
 					})
 				}
 

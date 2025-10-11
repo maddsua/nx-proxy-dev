@@ -107,6 +107,16 @@ func (svc *service) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if peer.Disabled {
+		slog.Debug("HTTP: Request cancelled; Peer disabled",
+			slog.String("client_ip", clientIP),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("host", host))
+		wrt.WriteHeader(http.StatusPaymentRequired)
+		return
+	}
+
 	if nxproxy.IsLocalAddress(host) {
 		slog.Warn("HTTP: Dest addr not allowed",
 			slog.String("client_ip", clientIP),

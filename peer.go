@@ -17,17 +17,50 @@ import (
 var ErrTooManyConnections = errors.New("too many connections")
 
 type PeerOptions struct {
-	ID             uuid.UUID     `json:"id"`
-	PasswordAuth   *UserPassword `json:"password_auth"`
-	MaxConnections uint          `json:"max_connections"`
-	Bandwidth      PeerBandwidth `json:"bandwidth"`
-	FramedIP       string        `json:"framed_ip"`
+
+	//	unique peer ID used for accounting identification
+	ID uuid.UUID `json:"id"`
+
+	//	optional (not so) paasword auth data
+	PasswordAuth *UserPassword `json:"password_auth"`
+
+	//	maximal number of open connections
+	MaxConnections uint `json:"max_connections"`
+
+	//	connection speed limits
+	Bandwidth PeerBandwidth `json:"bandwidth"`
+
+	//	public ip to use for outbound connections, optional
+	FramedIP string `json:"framed_ip,omitempty"`
+
+	//	used to disable a peer without completely removing it
+	Disabled bool `json:"disabled"`
+}
+
+type UserPassword struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+type PeerBandwidth struct {
+
+	//	total connection bandwidth for up/down streams
+	Rx uint32 `json:"rx"`
+	Tx uint32 `json:"tx"`
+
+	//	respective minimal speed per connection
+	MinRx uint32 `json:"min_rx"`
+	MinTx uint32 `json:"min_tx"`
 }
 
 type PeerDelta struct {
+
+	//	unique peer ID
 	PeerID uuid.UUID `json:"peer"`
-	Rx     uint64    `json:"rx"`
-	Tx     uint64    `json:"tx"`
+
+	//	data transferred
+	Rx uint64 `json:"rx"`
+	Tx uint64 `json:"tx"`
 }
 
 func (peer *PeerOptions) Fingerprint() string {
@@ -56,18 +89,6 @@ func (peer *PeerOptions) DisplayName() string {
 	}
 
 	return peer.ID.String()
-}
-
-type UserPassword struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
-}
-
-type PeerBandwidth struct {
-	Rx    uint32 `json:"rx"`
-	Tx    uint32 `json:"tx"`
-	MinRx uint32 `json:"min_rx"`
-	MinTx uint32 `json:"min_tx"`
 }
 
 type Peer struct {

@@ -123,7 +123,8 @@ func (svc *service) serveConn(conn net.Conn) {
 
 	if _, has := methods[AuthMethodPassword]; has {
 
-		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
+		peer, err = connPasswordAuth(conn, &svc.Slot)
+		if err != nil {
 
 			switch err.(type) {
 
@@ -161,6 +162,17 @@ func (svc *service) serveConn(conn net.Conn) {
 		return
 	}
 
+	//	cancel request if the peer is disabled
+	if peer.Disabled {
+		slog.Debug("SOCKS5: Request cancelled; Peer disabled",
+			slog.String("client_ip", clientIP.String()),
+			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
+			slog.String("peer", peer.DisplayName()),
+			slog.String("host", req.Addr.String()))
+		_ = reply(conn, ReplyErrConnNotAllowedByRuleset, nil)
+		return
+	}
+
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		slog.Debug("SOCKS5: Reset io timeouts",
 			slog.String("client_ip", clientIP.String()),
@@ -174,7 +186,7 @@ func (svc *service) serveConn(conn net.Conn) {
 		slog.Warn("SOCKS5: Dest addr not allowed",
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
-			slog.String("dst", req.Addr.String()))
+			slog.String("host", req.Addr.String()))
 		_ = reply(conn, ReplyErrConnNotAllowedByRuleset, nil)
 		return
 	}
@@ -191,7 +203,7 @@ func (svc *service) serveConn(conn net.Conn) {
 	}
 }
 
-func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Addr) {
+func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, host *Addr) {
 
 	clientIP, _ := nxproxy.GetAddrPort(conn.RemoteAddr())
 
@@ -205,9 +217,9 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 			slog.String("err", err.Error()))
 
 		if err == nxproxy.ErrTooManyConnections {
-			_ = reply(conn, ReplyErrConnNotAllowedByRuleset, remoteAddr)
+			_ = reply(conn, ReplyErrConnNotAllowedByRuleset, host)
 		} else {
-			_ = reply(conn, ReplyErrGeneric, remoteAddr)
+			_ = reply(conn, ReplyErrGeneric, host)
 		}
 
 		return
@@ -215,26 +227,26 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 
 	defer connCtl.Close()
 
-	dstConn, err := peer.Dialer.DialContext(connCtl.Context(), "tcp", remoteAddr.String())
+	dstConn, err := peer.Dialer.DialContext(connCtl.Context(), "tcp", host.String())
 	if err != nil {
 		slog.Debug("SOCKSv5: Connect: Unable to dial destination",
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("remote", remoteAddr.Host),
+			slog.String("host", host.Host),
 			slog.String("err", err.Error()))
-		_ = reply(conn, ReplyErrHostUnreachable, remoteAddr)
+		_ = reply(conn, ReplyErrHostUnreachable, host)
 		return
 	}
 
 	defer dstConn.Close()
 
-	if err := reply(conn, ReplyOk, remoteAddr); err != nil {
+	if err := reply(conn, ReplyOk, host); err != nil {
 		slog.Debug("SOCKSv5: Connect: Ack failed",
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("remote", remoteAddr.Host),
+			slog.String("host", host.Host),
 			slog.String("err", err.Error()))
 		return
 	}
@@ -243,14 +255,14 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, remoteAddr *Ad
 		slog.String("client_ip", clientIP.String()),
 		slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 		slog.String("peer", peer.DisplayName()),
-		slog.String("remote", remoteAddr.Host))
+		slog.String("host", host.Host))
 
 	if err := nxproxy.ProxyBridge(connCtl, conn, dstConn); err != nil {
 		slog.Debug("SOCKSv5: Connect: Broken pipe",
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("remote", remoteAddr.Host),
+			slog.String("host", host.Host),
 			slog.String("err", err.Error()))
 	}
 }
