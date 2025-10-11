@@ -1,0 +1,42 @@
+name: Release
+on:
+  release:
+    types: [published]
+jobs:
+  extract-tag:
+    name: Extract release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ env.RELEASE_TAG }}
+      version: ${{ env.RELEASE_VERSION }}
+    steps:
+      - name: Parse refs
+        run: |
+          RELEASE_TAG=${GITHUB_REF#refs/*/}
+          RELEASE_VERSION=$(echo "$RELEASE_TAG" | sed 's/^[^0-9]*//')
+          echo "Detected version: $RELEASE_VERSION; Tag: $RELEASE_TAG"
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+  build-debian:
+    name: Build proxy package
+    runs-on: ubuntu-22.04
+    needs: ["extract-tag"]
+    env:
+      VERSION: ${{ needs.extract-tag.outputs.version }}
+      TAG: ${{ needs.extract-tag.outputs.tag }}
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v4
+      - name: Install go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.24.4'
+      - name: Build package
+        run: make build-deb VERSION=${{ env.VERSION }}
+      - name: Prepare artifact
+        run: mv .build/nx-proxy-${{ env.VERSION }}.deb .build/nx-proxy-${{ env.VERSION }}-amd64.deb
+      - name: Upload artifact
+        run: gh release upload ${{ env.TAG }} .build/nx-proxy-${{ env.VERSION }}-amd64.deb
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
