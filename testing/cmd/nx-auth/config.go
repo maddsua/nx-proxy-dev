@@ -42,12 +42,8 @@ func FindConfigLocation() string {
 	entries := []string{
 		"./nx-auth.yaml",
 		"./nx-auth.yml",
-		"/opt/nx-proxy/nx-auth.yml",
-		"/opt/nx-proxy/nx-auth.yaml",
-		"~/nx-proxy/nx-auth.yml",
-		"~/nx-proxy/nx-auth.yaml",
-		"~/nx-auth.yml",
-		"~/nx-auth.yaml",
+		"./testing/cmd/nx-auth/nx-auth.yaml",
+		"./testing/cmd/nx-auth/nx-auth.yml",
 	}
 
 	var findFile = func(name string) bool {

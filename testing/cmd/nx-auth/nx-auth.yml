@@ -1,3 +1,5 @@
+# TEST CONFIG FOR NX-AUTH
+
 listen_addr: ":2500"
 proxy:
   services:
