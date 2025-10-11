@@ -55,6 +55,9 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 		hub.bindMap = map[string]nxproxy.SlotService{}
 	}
 
+	//	reset list of failed slots
+	hub.errSlots = nil
+
 	importedSlotIDSet := map[uuid.UUID]struct{}{}
 
 	var slotOptsValid = func(slot *nxproxy.SlotOptions) error {
