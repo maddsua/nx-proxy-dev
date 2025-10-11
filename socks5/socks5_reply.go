@@ -22,7 +22,7 @@ const (
 	ReplyErrAddrTypeNotSupported
 )
 
-func reply(conn net.Conn, val Reply, addr *Addr) (err error) {
+func reply(conn net.Conn, val Reply, addr *Addr) error {
 
 	var buff bytes.Buffer
 
@@ -39,6 +39,6 @@ func reply(conn net.Conn, val Reply, addr *Addr) (err error) {
 		buff.Write(bytes)
 	}
 
-	_, err = conn.Write(buff.Bytes())
+	_, err := conn.Write(buff.Bytes())
 	return err
 }

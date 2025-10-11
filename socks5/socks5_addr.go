@@ -46,15 +46,18 @@ func (val *Addr) MarshallBinary() ([]byte, error) {
 		}
 
 	} else {
+
+		hostLen := len(val.Host)
+		if hostLen > math.MaxUint8 {
+			return nil, fmt.Errorf("address too large")
+		}
+
 		buff.WriteByte(AddrDomainName)
+		buff.WriteByte(byte(hostLen))
 		buff.WriteString(val.Host)
 	}
 
 	buff.Write(binary.BigEndian.AppendUint16(nil, uint16(val.Port)))
-
-	if buff.Len() > math.MaxUint8 {
-		return nil, fmt.Errorf("address too large")
-	}
 
 	return buff.Bytes(), nil
 }
