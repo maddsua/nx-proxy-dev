@@ -138,8 +138,19 @@ func (svc *service) serveConn(conn net.Conn) {
 
 		if peer, err = connPasswordAuth(conn, &svc.Slot); err != nil {
 
-			if _, ok := err.(*nxproxy.RateLimitError); !ok {
-				slog.Debug("SOCKS5: Password auth: Failed",
+			switch err.(type) {
+
+			case *nxproxy.RateLimitError:
+				break
+
+			case *nxproxy.CredentialsError:
+				slog.Debug("SOCKS5: Invalid credentials",
+					slog.String("client_ip", clientIP.String()),
+					slog.String("proxy_addr", svc.SlotOptions.BindAddr),
+					slog.String("err", err.Error()))
+
+			default:
+				slog.Debug("SOCKS5: Password auth rejected",
 					slog.String("client_ip", clientIP.String()),
 					slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 					slog.String("err", err.Error()))

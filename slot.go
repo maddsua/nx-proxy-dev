@@ -14,8 +14,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var ErrUserNotFound = errors.New("user not found")
-var ErrPasswordInvalid = errors.New("password invalid")
 var ErrSlotOptionsIncompatible = errors.New("slot options incompatible")
 
 type SlotService interface {
@@ -52,6 +50,11 @@ type SlotOptions struct {
 
 func (opts *SlotOptions) Fingerprint() string {
 	return fmt.Sprintf("%s:%s", opts.Proto, opts.BindAddr)
+}
+
+type SlotDelta struct {
+	SlotID uuid.UUID `json:"slot"`
+	PeerDelta
 }
 
 type Slot struct {
@@ -294,7 +297,7 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 
 	peer := slot.userNameMap[username]
 	if peer == nil {
-		return nil, ErrUserNotFound
+		return nil, &CredentialsError{}
 	}
 
 	var comparePasswords = func(want, have string) bool {
@@ -302,9 +305,9 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 	}
 
 	if pa := peer.PasswordAuth; pa == nil {
-		return nil, ErrPasswordInvalid
+		return nil, &CredentialsError{}
 	} else if !comparePasswords(pa.Password, password) {
-		return nil, ErrPasswordInvalid
+		return nil, &CredentialsError{Username: &username}
 	}
 
 	if rlc != nil {
@@ -314,7 +317,15 @@ func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Pee
 	return peer, nil
 }
 
-type SlotDelta struct {
-	SlotID uuid.UUID `json:"slot"`
-	PeerDelta
+type CredentialsError struct {
+	Username *string
+}
+
+func (err *CredentialsError) Error() string {
+
+	if err.Username != nil {
+		return fmt.Sprintf("invalid password for %s", *err.Username)
+	}
+
+	return "username not found"
 }
