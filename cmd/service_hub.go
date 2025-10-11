@@ -134,7 +134,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				Proto:    entry.Proto,
 				BindAddr: entry.BindAddr,
 				Up:       false,
-				Errror:   err.Error(),
+				Error:    err.Error(),
 			})
 		}
 

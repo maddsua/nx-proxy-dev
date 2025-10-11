@@ -62,7 +62,7 @@ type SlotInfo struct {
 	Proto           ProxyProto `json:"proto"`
 	BindAddr        string     `json:"bind_addr"`
 	RegisteredPeers int        `json:"registered_peers"`
-	Errror          string     `json:"error"`
+	Error           string     `json:"error,omitempty"`
 }
 
 type Slot struct {
