@@ -284,23 +284,19 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	slot.userNameMap = newUserNameMap
 }
 
-func (slot *Slot) Close() (err error) {
+func (slot *Slot) ClosePeerConnections() {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
 
-	for key, peer := range slot.peerMap {
+	for _, peer := range slot.peerMap {
 
 		peer.CloseConnections()
 
 		if delta, has := peer.Delta(); has {
 			slot.oldDeltas = append(slot.oldDeltas, delta)
 		}
-
-		delete(slot.peerMap, key)
 	}
-
-	return
 }
 
 func (slot *Slot) LookupWithPassword(ip net.IP, username, password string) (*Peer, error) {

@@ -68,6 +68,8 @@ func (svc *service) Close() error {
 	svc.cancelFn()
 	err := svc.listener.Close()
 
+	svc.Slot.ClosePeerConnections()
+
 	return err
 }
 

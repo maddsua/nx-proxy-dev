@@ -54,7 +54,9 @@ func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
 }
 
 func (svc *service) Close() error {
-	return svc.srv.Close()
+	err := svc.srv.Close()
+	svc.Slot.ClosePeerConnections()
+	return err
 }
 
 func (svc *service) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {

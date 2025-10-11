@@ -177,11 +177,11 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 	}
 
 	//	remove slot entries that weren't updated
-	for key, slot := range hub.bindMap {
+	for key, service := range hub.bindMap {
 
-		info := slot.Info()
+		info := service.Info()
 
-		if err := slot.Close(); err != nil {
+		if err := service.Close(); err != nil {
 
 			if newSlot, has := newBindMap[key]; has {
 
@@ -199,7 +199,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				slog.Error("ServiceHub: Slot failed to terminate; Keeping and retrying again",
 					slog.String("id", info.ID.String()),
 					slog.String("err", err.Error()))
-				newBindMap[key] = slot
+				newBindMap[key] = service
 			}
 
 		} else {
@@ -209,7 +209,7 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 				slog.String("addr", info.BindAddr))
 		}
 
-		hub.oldDeltas = append(hub.oldDeltas, slot.Deltas()...)
+		hub.oldDeltas = append(hub.oldDeltas, service.Deltas()...)
 
 		delete(hub.bindMap, key)
 	}
