@@ -13,8 +13,36 @@ import (
 )
 
 type Response[T any] struct {
-	Data  *T     `json:"data"`
-	Error *Error `json:"error"`
+	Data  *T        `json:"data"`
+	Error *APIError `json:"error"`
+}
+
+func (resp *Response[T]) Write(wrt io.Writer) error {
+	return json.NewEncoder(wrt).Encode(resp)
+}
+
+func writeResponse[T any](wrt http.ResponseWriter, val *T, err error) {
+
+	wrt.Header().Set("Content-Type", "application/json")
+
+	resp := Response[T]{Data: val}
+
+	if err != nil {
+
+		if apierr, ok := err.(*APIError); ok {
+			resp.Error = apierr
+		} else {
+			resp.Error = &APIError{Message: err.Error()}
+		}
+
+		if err, ok := err.(StatusCoder); ok {
+			wrt.WriteHeader(err.StatusCode())
+		} else {
+			wrt.WriteHeader(http.StatusBadRequest)
+		}
+	}
+
+	resp.Write(wrt)
 }
 
 func decodeResponse[T any](reader io.Reader) (*Response[T], error) {
@@ -27,8 +55,24 @@ func decodeResponse[T any](reader io.Reader) (*Response[T], error) {
 	return &val, nil
 }
 
-type Error struct {
+type StatusCoder interface {
+	StatusCode() int
+}
+
+type APIError struct {
 	Message string `json:"message"`
+	Status  int    `json:"-"`
+}
+
+func (err *APIError) Error() string {
+	return "api: " + err.Message
+}
+
+func (err *APIError) StatusCode() int {
+	if status := err.Status; status >= http.StatusBadRequest {
+		return status
+	}
+	return http.StatusBadRequest
 }
 
 func beacon(baseUrl *url.URL, token *nxproxy.ServerToken, method string, path string, payload any) error {
@@ -66,7 +110,8 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 	}
 
 	if token != nil {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.String()))
+		bearer := strings.Join([]string{"Bearer", token.String()}, " ")
+		req.Header.Set("Authorization", bearer)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -95,7 +140,7 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 		}
 
 		if apiResp.Error != nil {
-			return nil, fmt.Errorf("api: %v", apiResp.Error.Message)
+			return nil, apiResp.Error
 		} else if apiResp.Data == nil {
 			return nil, fmt.Errorf("api: empty data payload")
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 
 	nxproxy "github.com/maddsua/nx-proxy"
+	"github.com/maddsua/nx-proxy/rest"
 	"github.com/maddsua/nx-proxy/rest/model"
 )
 
@@ -24,79 +26,80 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := http.NewServeMux()
+	handler := rest.ProcedureHandler{
 
-	mux.Handle("GET /v1/config", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		HandleFullConfig: func(ctx context.Context, token *nxproxy.ServerToken) (*model.FullConfig, error) {
 
-		if val, err := LoadConfig(cfg.location); err != nil {
-			slog.Error("Reload config",
-				slog.String("loc", cfg.location),
-				slog.String("err", err.Error()))
-		} else {
-			cfg.Proxy = val.Proxy
-		}
+			if token == nil {
+				return nil, fmt.Errorf("unauthorized")
+			}
 
-		w.Header().Set("Content-Type", "application/json")
+			slog.Info("Sending config",
+				slog.String("token_id", token.ID.String()))
 
-		var services []nxproxy.ServiceOptions
-		for _, entry := range cfg.Proxy.Services {
+			if val, err := LoadConfig(cfg.location); err != nil {
+				slog.Error("Reload config",
+					slog.String("loc", cfg.location),
+					slog.String("err", err.Error()))
+			} else {
+				cfg.Proxy = val.Proxy
+			}
 
-			var peers []nxproxy.PeerOptions
+			var services []nxproxy.ServiceOptions
+			for _, entry := range cfg.Proxy.Services {
 
-			for _, entry := range entry.Peers {
-				peers = append(peers, nxproxy.PeerOptions{
-					ID: entry.ID,
-					PasswordAuth: &nxproxy.UserPassword{
-						User:     entry.UserName,
-						Password: entry.Password,
-					},
-					MaxConnections: entry.MaxConnections,
-					FramedIP:       entry.FramedIP,
-					Bandwidth: nxproxy.PeerBandwidth{
-						Rx: entry.RxRate,
-						Tx: entry.TxRate,
+				var peers []nxproxy.PeerOptions
+
+				for _, entry := range entry.Peers {
+					peers = append(peers, nxproxy.PeerOptions{
+						ID: entry.ID,
+						PasswordAuth: &nxproxy.UserPassword{
+							User:     entry.UserName,
+							Password: entry.Password,
+						},
+						MaxConnections: entry.MaxConnections,
+						FramedIP:       entry.FramedIP,
+						Bandwidth: nxproxy.PeerBandwidth{
+							Rx: entry.RxRate,
+							Tx: entry.TxRate,
+						},
+					})
+				}
+
+				services = append(services, nxproxy.ServiceOptions{
+					Peers: peers,
+					SlotOptions: nxproxy.SlotOptions{
+						ID:       entry.ID,
+						Proto:    nxproxy.ProxyProto(entry.Proto),
+						BindAddr: entry.BindAddr,
 					},
 				})
 			}
 
-			services = append(services, nxproxy.ServiceOptions{
-				Peers: peers,
-				SlotOptions: nxproxy.SlotOptions{
-					ID:       entry.ID,
-					Proto:    nxproxy.ProxyProto(entry.Proto),
-					BindAddr: entry.BindAddr,
-				},
-			})
-		}
-
-		json.NewEncoder(w).Encode(map[string]any{
-			"data": model.FullConfig{
+			return &model.FullConfig{
 				Services: services,
 				DNS:      cfg.Proxy.Dns,
-			},
-		})
-	}))
+			}, nil
+		},
 
-	mux.Handle("POST /v1/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		HandleStatus: func(ctx context.Context, token *nxproxy.ServerToken, status *model.Status) error {
 
-		defer w.WriteHeader(http.StatusNoContent)
+			if token == nil {
+				return fmt.Errorf("unauthorized")
+			}
 
-		var status model.Status
+			data, _ := json.MarshalIndent(status, "", "  ")
+			slog.Info("Dumping status",
+				slog.String("token_id", token.ID.String()))
+			fmt.Print(string(data))
 
-		if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-			slog.Error("Decode status",
-				slog.String("err", err.Error()))
-			return
-		}
-
-		data, _ := json.MarshalIndent(status, "", "  ")
-		slog.Info("Dumping status")
-		fmt.Print(string(data))
-	}))
+			return nil
+		},
+	}
 
 	srv := http.Server{
 		Addr:    cfg.ListenAddr,
-		Handler: mux,
+		Handler: rest.NewHandler(handler),
 	}
 
 	errCh := make(chan error, 1)
