@@ -1,0 +1,6 @@
+Package: nx-proxy
+Architecture: amd64
+Maintainer: maddsua
+Section: net
+Priority: optional
+Description: A not so scalable but fully auto-configurable proxy service 
