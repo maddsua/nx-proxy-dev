@@ -8,7 +8,7 @@ import (
 
 type ConfigEntries map[string]string
 
-func LoadConfigFile() ConfigEntries {
+func LoadConfigFile() (ConfigEntries, string) {
 
 	entries := []string{
 		"/etc/nx-proxy/nx-proxy.conf",
@@ -61,11 +61,11 @@ func LoadConfigFile() ConfigEntries {
 
 	for _, name := range entries {
 		if val, err := readContents(name); err == nil {
-			return val
+			return val, name
 		}
 	}
 
-	return nil
+	return nil, ""
 }
 
 func GetConfigOpt(fileEntries ConfigEntries, name string) (string, bool) {

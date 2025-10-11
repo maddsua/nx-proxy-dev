@@ -19,42 +19,53 @@ import (
 
 func main() {
 
-	configFileEntries := LoadConfigFile()
-	if configFileEntries == nil {
-		slog.Warn("No config files found")
+	lock, err := NewInstanceLock()
+	if err != nil {
+		slog.Error("Another running instance detected. Aborting")
+		os.Exit(1)
 	}
 
-	if val, _ := GetConfigOpt(configFileEntries, "DEBUG"); strings.ToLower(val) == "true" {
+	defer lock.Unlock()
+
+	cfgEntries, cfgLocation := LoadConfigFile()
+	if cfgEntries == nil {
+		slog.Warn("No config files found")
+	} else {
+		slog.Info("Loaded config",
+			slog.String("loc", cfgLocation))
+	}
+
+	if val, _ := GetConfigOpt(cfgEntries, "DEBUG"); strings.ToLower(val) == "true" {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 		slog.Debug("ENABLED")
 	}
 
 	var client rest.Client
 
-	if val, ok := GetConfigOpt(configFileEntries, "SECRET_TOKEN"); ok {
+	if val, ok := GetConfigOpt(cfgEntries, "SECRET_TOKEN"); ok {
 		token, err := nxproxy.ParseServerToken(val)
 		if err != nil {
-			slog.Error("STARTUP: Parse secret token",
+			slog.Error("Parse secret token",
 				slog.String("err", err.Error()))
 			os.Exit(1)
 		}
 		client.Token = token
 	} else {
-		slog.Warn("STARTUP: Secret token not provided")
+		slog.Warn("Secret token not provided")
 	}
 
-	if val, ok := GetConfigOpt(configFileEntries, "AUTH_URL"); ok {
+	if val, ok := GetConfigOpt(cfgEntries, "AUTH_URL"); ok {
 
 		url, err := url.Parse(val)
 		if err != nil {
-			slog.Error("STARTUP: Parse auth server url",
+			slog.Error("Parse auth server url",
 				slog.String("err", err.Error()))
 			os.Exit(1)
 		}
 		client.URL = url
 
 	} else {
-		slog.Error("STARTUP: Auth server url not provided")
+		slog.Error("Auth server url not provided")
 		os.Exit(1)
 	}
 
