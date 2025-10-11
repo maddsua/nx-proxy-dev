@@ -139,32 +139,21 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 		}
 
 		var slot nxproxy.SlotService
-
 		switch entry.Proto {
-
 		case nxproxy.ProxyProtoSocks:
-			if slot, err = socks5_proxy.NewService(entry.SlotOptions, &hub.dns); err != nil {
-				slog.Error("ServiceHub: Create slot: socks5",
-					slog.String("id", entry.ID.String()),
-					slog.String("err", err.Error()))
-				storeSlotErr(err)
-				continue
-			}
-
+			slot, err = socks5_proxy.NewService(entry.SlotOptions, &hub.dns)
 		case nxproxy.ProxyProtoHttp:
-			if slot, err = http_proxy.NewService(entry.SlotOptions, &hub.dns); err != nil {
-				slog.Error("ServiceHub: Create slot: http",
-					slog.String("id", entry.ID.String()),
-					slog.String("err", err.Error()))
-				storeSlotErr(err)
-				continue
-			}
-
+			slot, err = http_proxy.NewService(entry.SlotOptions, &hub.dns)
 		default:
-			slog.Error("ServiceHub: Create slot: Unsupported service protocol",
+			err = nxproxy.ErrUnsupportedProto
+		}
+
+		if err != nil {
+			slog.Error("ServiceHub: Unable to create slot",
 				slog.String("id", entry.ID.String()),
+				slog.String("proto", string(entry.Proto)),
 				slog.String("proto", string(entry.Proto)))
-			storeSlotErr(fmt.Errorf("unsupported protocol"))
+			storeSlotErr(err)
 			continue
 		}
 

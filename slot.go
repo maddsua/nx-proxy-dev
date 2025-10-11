@@ -15,6 +15,7 @@ import (
 )
 
 var ErrSlotOptionsIncompatible = errors.New("slot options incompatible")
+var ErrUnsupportedProto = errors.New("unsupported protocol")
 
 type SlotService interface {
 	Info() SlotInfo
