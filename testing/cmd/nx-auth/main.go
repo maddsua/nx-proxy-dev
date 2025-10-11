@@ -26,7 +26,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /config", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("GET /v1/config", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if val, err := LoadConfig(cfg.location); err != nil {
 			slog.Error("Reload config",
@@ -77,7 +77,7 @@ func main() {
 		})
 	}))
 
-	mux.Handle("POST /status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("POST /v1/status", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		defer w.WriteHeader(http.StatusNoContent)
 
