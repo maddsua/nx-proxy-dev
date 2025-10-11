@@ -18,8 +18,7 @@ type ServiceHub struct {
 	bindMap   map[string]nxproxy.SlotService
 	mtx       sync.Mutex
 	oldDeltas []nxproxy.SlotDelta
-	//	todo: use
-	errSlots []nxproxy.SlotInfo
+	errSlots  []nxproxy.SlotInfo
 }
 
 func (hub *ServiceHub) SetConfig(cfg *model.FullConfig) {

@@ -71,7 +71,7 @@ type Slot struct {
 	Rl          *RateLimiter
 	DNS         DnsProvider
 
-	deferredDeltas []PeerDelta
+	oldDeltas []PeerDelta
 
 	peerMap     map[uuid.UUID]*Peer
 	userNameMap map[string]*Peer
@@ -93,8 +93,8 @@ func (slot *Slot) Deltas() []SlotDelta {
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
 
-	deltaList := slices.Clone(slot.deferredDeltas)
-	slot.deferredDeltas = nil
+	deltaList := slices.Clone(slot.oldDeltas)
+	slot.oldDeltas = nil
 
 	for _, peer := range slot.peerMap {
 		if delta, has := peer.Delta(); has {
@@ -125,12 +125,6 @@ func (slot *Slot) Deltas() []SlotDelta {
 	}
 
 	return entries
-}
-
-func (slot *Slot) deferPeerDelta(peer *Peer) {
-	if delta, has := peer.Delta(); has {
-		slot.deferredDeltas = append(slot.deferredDeltas, delta)
-	}
 }
 
 func (slot *Slot) SetPeers(entries []PeerOptions) {
@@ -164,6 +158,12 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		}
 
 		return nil
+	}
+
+	var storePeerDelta = func(peer *Peer) {
+		if delta, has := peer.Delta(); has {
+			slot.oldDeltas = append(slot.oldDeltas, delta)
+		}
 	}
 
 	newPeerMap := map[uuid.UUID]*Peer{}
@@ -223,7 +223,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			}
 
 			peer.CloseConnections()
-			slot.deferPeerDelta(peer)
+			storePeerDelta(peer)
 		}
 
 		peer := Peer{
@@ -236,8 +236,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				KeepAlive: 30 * time.Second,
 			},
 		}
-
-		//	todo: somehow, gotta fix the dylemma of import cycles
 
 		if _, has := newPeerMap[entry.ID]; has {
 			slog.Debug("Replace peer",
@@ -264,7 +262,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				slog.String("name", peer.DisplayName()))
 
 			peer.CloseConnections()
-			slot.deferPeerDelta(peer)
+			storePeerDelta(peer)
 		}
 	}
 
@@ -287,8 +285,13 @@ func (slot *Slot) Close() (err error) {
 	defer slot.mtx.Unlock()
 
 	for key, peer := range slot.peerMap {
+
 		peer.CloseConnections()
-		slot.deferPeerDelta(peer)
+
+		if delta, has := peer.Delta(); has {
+			slot.oldDeltas = append(slot.oldDeltas, delta)
+		}
+
 		delete(slot.peerMap, key)
 	}
 
