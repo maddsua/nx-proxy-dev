@@ -153,7 +153,8 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 			slog.Error("Unable to create slot",
 				slog.String("id", entry.ID.String()),
 				slog.String("proto", string(entry.Proto)),
-				slog.String("bind_addr", entry.BindAddr))
+				slog.String("bind_addr", entry.BindAddr),
+				slog.String("err", err.Error()))
 			storeSlotErr(err)
 			continue
 		}
