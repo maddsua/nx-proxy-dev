@@ -109,6 +109,10 @@ func fetch[T any](baseUrl *url.URL, token *nxproxy.ServerToken, method string, p
 		return nil, err
 	}
 
+	if bodyReader != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
 	if token != nil {
 		bearer := strings.Join([]string{"Bearer", token.String()}, " ")
 		req.Header.Set("Authorization", bearer)
