@@ -36,7 +36,7 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /v1/config", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
+	mux.Handle("GET /nxproxy/v1/config", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
 
 		if proc.HandleFullConfig == nil {
 			handlerNotImplemented(wrt)
@@ -49,7 +49,7 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 		writeResponse(wrt, result, err)
 	}))
 
-	mux.Handle("POST /v1/status", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
+	mux.Handle("POST /nxproxy/v1/status", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
 
 		if proc.HandleStatus == nil {
 			handlerNotImplemented(wrt)

@@ -14,9 +14,9 @@ type Client struct {
 }
 
 func (client *Client) PostStatus(status *model.Status) error {
-	return beacon(client.URL, client.Token, http.MethodPost, "/v1/status", status)
+	return beacon(client.URL, client.Token, http.MethodPost, "/nxproxy/v1/status", status)
 }
 
 func (client *Client) PullConfig() (*model.FullConfig, error) {
-	return fetch[model.FullConfig](client.URL, client.Token, http.MethodGet, "/v1/config", nil)
+	return fetch[model.FullConfig](client.URL, client.Token, http.MethodGet, "/nxproxy/v1/config", nil)
 }
