@@ -22,6 +22,10 @@ func GetAddrPort(addr net.Addr) (net.IP, int) {
 
 func IsLocalAddress(addr string) bool {
 
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		addr = host
+	}
+
 	ipAddr, _ := net.ResolveIPAddr("ip", addr)
 	if ipAddr == nil {
 		return false

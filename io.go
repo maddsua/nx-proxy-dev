@@ -100,7 +100,7 @@ func SpliceConn(ctx context.Context, dst io.Writer, src io.Reader, bw BandwidthF
 				return io.ErrShortWrite
 			}
 
-			FramedIoWait(bandwidth, min(written, read), started)
+			WaitTCIO(bandwidth, min(written, read), started)
 		}
 
 		return err
@@ -142,12 +142,12 @@ func SpliceConn(ctx context.Context, dst io.Writer, src io.Reader, bw BandwidthF
 }
 
 // Creates a fake delay that can be used to limit data transfer rate
-func FramedIoWait(bandwidth int, size int, started time.Time) {
+func WaitTCIO(bandwidth int, size int, started time.Time) {
 	elapsed := time.Since(started)
-	time.Sleep(FramedIoDuration(bandwidth, size) - elapsed)
+	time.Sleep(DurationTCIO(bandwidth, size) - elapsed)
 }
 
 // Returns the amount of time it's expected for an IO operation to take. Bandwidth in bps, size in bytes
-func FramedIoDuration(bandwidth int, size int) time.Duration {
+func DurationTCIO(bandwidth int, size int) time.Duration {
 	return time.Duration(int64(time.Second) * int64(size) / int64(bandwidth))
 }

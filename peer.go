@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -74,6 +75,7 @@ type Peer struct {
 
 	BaseContext context.Context
 	Dialer      net.Dialer
+	HttpClient  *http.Client
 
 	DeltaRx atomic.Uint64
 	DeltaTx atomic.Uint64
@@ -238,6 +240,11 @@ func (peer *Peer) CloseConnections() {
 
 	peer.mtx.Lock()
 	defer peer.mtx.Unlock()
+
+	//	todo: triage
+	if peer.HttpClient != nil {
+		peer.HttpClient.CloseIdleConnections()
+	}
 
 	for key, conn := range peer.connMap {
 

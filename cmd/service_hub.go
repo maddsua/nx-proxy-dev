@@ -9,8 +9,9 @@ import (
 	"github.com/google/uuid"
 	nxproxy "github.com/maddsua/nx-proxy"
 
+	http_proxy "github.com/maddsua/nx-proxy/http"
 	"github.com/maddsua/nx-proxy/rest/model"
-	socksv5 "github.com/maddsua/nx-proxy/socks5"
+	socks5_proxy "github.com/maddsua/nx-proxy/socks5"
 )
 
 type ServiceHub struct {
@@ -125,13 +126,23 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 		var slot nxproxy.SlotService
 
 		switch entry.Proto {
+
 		case nxproxy.ProxyProtoSocks:
-			if slot, err = socksv5.NewService(entry.SlotOptions, &hub.dns); err != nil {
-				slog.Error("ServiceHub: Create slot: Socks5",
-					slog.String("id", slot.ID().String()),
+			if slot, err = socks5_proxy.NewService(entry.SlotOptions, &hub.dns); err != nil {
+				slog.Error("ServiceHub: Create slot: socks5",
+					slog.String("id", entry.ID.String()),
 					slog.String("err", err.Error()))
 				continue
 			}
+
+		case nxproxy.ProxyProtoHttp:
+			if slot, err = http_proxy.NewService(entry.SlotOptions, &hub.dns); err != nil {
+				slog.Error("ServiceHub: Create slot: http",
+					slog.String("id", entry.ID.String()),
+					slog.String("err", err.Error()))
+				continue
+			}
+
 		default:
 			slog.Error("ServiceHub: Create slot: Unsupported service protocol",
 				slog.String("id", entry.ID.String()),

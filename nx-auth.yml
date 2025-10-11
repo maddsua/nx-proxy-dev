@@ -11,4 +11,14 @@ proxy:
           max_connections: 64
           rx_rate: 50000
           tx_rate: 50000
+    - id: b0ae638b-5272-4d04-bea9-2e7a58d7031c
+      proto: http
+      bind_addr: 127.0.0.1:8080
+      peers:
+        - id: 884ed5ac-e617-4b43-aa38-03b433ebd7b2
+          username: maddsua
+          password: JuPTAg2ors3Z8Ybn7pGmDin8J6ZTHjCA
+          max_connections: 64
+          rx_rate: 50000
+          tx_rate: 50000
   dns: 1.1.1.1

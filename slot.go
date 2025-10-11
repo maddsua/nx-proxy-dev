@@ -220,6 +220,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			},
 		}
 
+		//	todo: somehow, gotta fix the dylemma of import cycles
+
 		if _, has := newPeerMap[entry.ID]; has {
 			slog.Debug("Replace peer",
 				slog.String("slot_id", slot.ID.String()),
