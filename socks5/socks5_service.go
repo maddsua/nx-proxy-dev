@@ -235,7 +235,7 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, host *Addr) {
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("host", host.Host),
+			slog.String("host", host.String()),
 			slog.String("err", err.Error()))
 		_ = reply(conn, ReplyErrHostUnreachable, host)
 		return
@@ -248,7 +248,7 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, host *Addr) {
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("host", host.Host),
+			slog.String("host", host.String()),
 			slog.String("err", err.Error()))
 		return
 	}
@@ -257,14 +257,14 @@ func (svc *service) cmdConnect(conn net.Conn, peer *nxproxy.Peer, host *Addr) {
 		slog.String("client_ip", clientIP.String()),
 		slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 		slog.String("peer", peer.DisplayName()),
-		slog.String("host", host.Host))
+		slog.String("host", host.String()))
 
 	if err := nxproxy.ProxyBridge(connCtl, conn, dstConn); err != nil {
 		slog.Debug("SOCKSv5: Connect: Broken pipe",
 			slog.String("client_ip", clientIP.String()),
 			slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 			slog.String("peer", peer.DisplayName()),
-			slog.String("host", host.Host),
+			slog.String("host", host.String()),
 			slog.String("err", err.Error()))
 	}
 }
