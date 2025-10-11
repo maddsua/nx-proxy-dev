@@ -83,12 +83,14 @@ func main() {
 		slog.Debug("API: Config updated")
 	}
 
-	var deltasQueue []nxproxy.SlotDelta
+	deltasQueue := make([]nxproxy.SlotDelta, 0)
 
 	var doStatusPush = func() {
 
+		newDeltas := hub.Deltas()
+
 		metrics := model.Status{
-			Deltas: append(deltasQueue, hub.Deltas()...),
+			Deltas: append(deltasQueue, newDeltas...),
 			Slots:  hub.SlotInfo(),
 			Service: model.ServiceInfo{
 				RunID:  runID,
@@ -99,11 +101,11 @@ func main() {
 		if err := client.PostStatus(&metrics); err != nil {
 			slog.Error("API: PostMetrics",
 				slog.String("err", err.Error()))
-			deltasQueue = metrics.Deltas
+			deltasQueue = append(deltasQueue, newDeltas...)
 			return
 		}
 
-		deltasQueue = nil
+		deltasQueue = make([]nxproxy.SlotDelta, 0)
 
 		slog.Debug("API: Metrics sent",
 			slog.String("remote", client.URL.Host),

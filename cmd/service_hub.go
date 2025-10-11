@@ -222,7 +222,7 @@ func (hub *ServiceHub) Deltas() []nxproxy.SlotDelta {
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
 
-	entries := hub.oldDeltas
+	entries := append([]nxproxy.SlotDelta{}, hub.oldDeltas...)
 	hub.oldDeltas = nil
 
 	for _, slot := range hub.bindMap {
@@ -237,7 +237,7 @@ func (hub *ServiceHub) SlotInfo() []nxproxy.SlotInfo {
 	hub.mtx.Lock()
 	defer hub.mtx.Unlock()
 
-	entries := hub.errSlots
+	entries := append([]nxproxy.SlotInfo{}, hub.errSlots...)
 	hub.errSlots = nil
 
 	for _, slot := range hub.bindMap {
