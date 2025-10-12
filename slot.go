@@ -198,18 +198,37 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
 
-			//	check if we have to reauthenticate
+			//	check if we have state changes
 			mustReauth := !peer.PeerOptions.CmpCredentials(entry)
+			disabledFlagChanged := peer.Disabled != entry.Disabled
 
 			//	update peer props
 			peer.PeerOptions = entry
 			peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
 
+			//	drop connections if peer has to be disabled
 			if peer.Disabled {
 				peer.CloseConnections()
+				storePeerDelta(peer)
 			}
 
+			if disabledFlagChanged {
+				if peer.Disabled {
+					slog.Info("Peer disabled",
+						slog.String("slot_id", slot.ID.String()),
+						slog.String("id", peer.ID.String()),
+						slog.String("name", peer.DisplayName()))
+				} else {
+					slog.Info("Peer enabled",
+						slog.String("slot_id", slot.ID.String()),
+						slog.String("id", peer.ID.String()),
+						slog.String("name", peer.DisplayName()))
+				}
+			}
+
+			//	also drop connections has to reauth
 			if mustReauth {
+
 				slog.Info("Peer credentials changed; Must reauthenticate",
 					slog.String("slot_id", slot.ID.String()),
 					slog.String("id", peer.ID.String()),
