@@ -3,7 +3,6 @@ package main
 import (
 	"log/slog"
 	"net"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -42,6 +41,22 @@ func main() {
 
 	var client rest.Client
 
+	if val, ok := GetConfigOpt(cfgEntries, "AUTH_URL"); ok {
+
+		url, err := ParseAuthUrl(val)
+		if err != nil {
+			slog.Error("Parse auth server url",
+				slog.String("err", err.Error()),
+				slog.String("url", val))
+			os.Exit(1)
+		}
+		client.URL = url
+
+	} else {
+		slog.Error("Auth server url not provided")
+		os.Exit(1)
+	}
+
 	if val, ok := GetConfigOpt(cfgEntries, "SECRET_TOKEN"); ok {
 		token, err := nxproxy.ParseServerToken(val)
 		if err != nil {
@@ -52,21 +67,6 @@ func main() {
 		client.Token = token
 	} else {
 		slog.Warn("Secret token not provided")
-	}
-
-	if val, ok := GetConfigOpt(cfgEntries, "AUTH_URL"); ok {
-
-		url, err := url.Parse(val)
-		if err != nil {
-			slog.Error("Parse auth server url",
-				slog.String("err", err.Error()))
-			os.Exit(1)
-		}
-		client.URL = url
-
-	} else {
-		slog.Error("Auth server url not provided")
-		os.Exit(1)
 	}
 
 	var hub ServiceHub

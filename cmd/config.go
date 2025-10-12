@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -87,4 +90,25 @@ func GetConfigOpt(fileEntries ConfigEntries, name string) (string, bool) {
 	}
 
 	return "", false
+}
+
+func ParseAuthUrl(val string) (*url.URL, error) {
+
+	url, err := url.Parse(val)
+	if err != nil {
+		return nil, err
+	}
+
+	switch url.Scheme {
+	case "http", "https":
+		break
+	default:
+		return nil, fmt.Errorf("invalid url scheme: %s", url.Scheme)
+	}
+
+	if url.Host == "" {
+		return nil, errors.New("invalid url host")
+	}
+
+	return url, nil
 }
