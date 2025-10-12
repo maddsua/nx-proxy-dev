@@ -193,42 +193,37 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 		if peer, ok := slot.peerMap[entry.ID]; ok {
 
-			if peer.PeerOptions.Fingerprint() == entry.Fingerprint() {
+			slog.Debug("Update peer",
+				slog.String("slot_id", slot.ID.String()),
+				slog.String("id", peer.ID.String()),
+				slog.String("name", peer.DisplayName()))
 
-				//	check if we have to reauthenticate
-				mustReauth := !peer.PeerOptions.CmpCredentials(entry)
+			//	check if we have to reauthenticate
+			mustReauth := !peer.PeerOptions.CmpCredentials(entry)
 
-				//	update peer props
-				peer.PeerOptions = entry
-				peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
+			//	update peer props
+			peer.PeerOptions = entry
+			peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
 
-				if peer.Disabled {
-					peer.CloseConnections()
-				}
+			if peer.Disabled {
+				peer.CloseConnections()
+			}
 
-				if mustReauth {
-					slog.Debug("Peer credentials changed; Must reauthenticate",
-						slog.String("slot_id", slot.ID.String()),
-						slog.String("id", peer.ID.String()),
-						slog.String("name", peer.DisplayName()))
-
-					peer.CloseConnections()
-				}
-
-				//	update maps
-				newPeerMap[peer.ID] = peer
-				delete(slot.peerMap, entry.ID)
-
-				slog.Debug("Update peer",
+			if mustReauth {
+				slog.Info("Peer credentials changed; Must reauthenticate",
 					slog.String("slot_id", slot.ID.String()),
 					slog.String("id", peer.ID.String()),
 					slog.String("name", peer.DisplayName()))
 
-				continue
+				peer.CloseConnections()
+				storePeerDelta(peer)
 			}
 
-			peer.CloseConnections()
-			storePeerDelta(peer)
+			//	update maps
+			newPeerMap[peer.ID] = peer
+			delete(slot.peerMap, entry.ID)
+
+			continue
 		}
 
 		peer := Peer{
@@ -242,17 +237,10 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			},
 		}
 
-		if _, has := newPeerMap[entry.ID]; has {
-			slog.Debug("Replace peer",
-				slog.String("slot_id", slot.ID.String()),
-				slog.String("id", peer.ID.String()),
-				slog.String("name", peer.DisplayName()))
-		} else {
-			slog.Info("Create peer",
-				slog.String("slot_id", slot.ID.String()),
-				slog.String("id", peer.ID.String()),
-				slog.String("name", peer.DisplayName()))
-		}
+		slog.Info("Create peer",
+			slog.String("slot_id", slot.ID.String()),
+			slog.String("id", peer.ID.String()),
+			slog.String("name", peer.DisplayName()))
 
 		newPeerMap[entry.ID] = &peer
 	}

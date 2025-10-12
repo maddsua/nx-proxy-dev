@@ -3,7 +3,6 @@ package nxproxy
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"net"
 	"net/http"
@@ -63,16 +62,11 @@ type PeerDelta struct {
 	Tx uint64 `json:"tx"`
 }
 
-func (peer *PeerOptions) Fingerprint() string {
-
-	if auth := peer.PasswordAuth; auth != nil {
-		return fmt.Sprintf("%v:pass:%s", peer.ID, auth.User)
-	}
-
-	return "<nil>"
-}
-
 func (peer *PeerOptions) CmpCredentials(other PeerOptions) bool {
+
+	if peer.ID != other.ID {
+		return false
+	}
 
 	if auth := peer.PasswordAuth; auth != nil && other.PasswordAuth != nil {
 		return auth.User == other.PasswordAuth.User &&
