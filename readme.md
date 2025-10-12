@@ -42,7 +42,7 @@ SECRET_TOKEN=<YOUR_BASE64_ENCODED_TOKEN_HERE>
 AUTH_URL=<YOUR_BACKEND_URL_AND_PATH_PREFIX>
 # optional debug flag
 # WARNING: it causes the logs to be pretty flooded!
-DEBUG=true
+# DEBUG=true
 ```
 
 Important note: URL's support path prefixes. For instance, if your auth endpoint is located at `https://backend.myapp.local/api/rest/v1/proxytables/` - this is exactly what your `AUTH_URL` should look like. All the necessary paths would be appended to this base url.
