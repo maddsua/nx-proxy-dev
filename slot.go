@@ -47,8 +47,15 @@ type SlotOptions struct {
 	BindAddr string     `json:"bind_addr"`
 }
 
-func (opts *SlotOptions) Fingerprint() string {
-	return fmt.Sprintf("%s:%s", opts.Proto, opts.BindAddr)
+func (opts *SlotOptions) Compatible(other *SlotOptions) bool {
+
+	if other == nil || opts == nil {
+		return false
+	}
+
+	return opts.ID == other.ID &&
+		opts.Proto == other.Proto &&
+		opts.BindAddr == other.BindAddr
 }
 
 type SlotDelta struct {

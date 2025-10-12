@@ -44,7 +44,7 @@ type service struct {
 
 func (svc *service) SetOptions(opts nxproxy.SlotOptions) error {
 
-	if svc.SlotOptions.Fingerprint() != opts.Fingerprint() {
+	if !svc.SlotOptions.Compatible(&opts) {
 		return nxproxy.ErrSlotOptionsIncompatible
 	}
 
