@@ -34,6 +34,29 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 		})
 	}
 
+	var authorize = func(wrt http.ResponseWriter, req *http.Request) *nxproxy.ServerToken {
+
+		token, err := requestToken(req)
+		if err != nil {
+
+			writeResponse[any](wrt, nil, &APIError{
+				Message: fmt.Sprintf("invalid token: %v", err),
+				Status:  http.StatusBadRequest,
+			})
+			return nil
+
+		} else if token == nil {
+
+			writeResponse[any](wrt, nil, &APIError{
+				Message: "unauthorized",
+				Status:  http.StatusUnauthorized,
+			})
+			return nil
+		}
+
+		return token
+	}
+
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /nxproxy/v1/config", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
@@ -45,8 +68,10 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 
 		defer panicHandler(wrt)
 
-		result, err := proc.HandleFullConfig(req.Context(), requestToken(req))
-		writeResponse(wrt, result, err)
+		if token := authorize(wrt, req); token != nil {
+			result, err := proc.HandleFullConfig(req.Context(), token)
+			writeResponse(wrt, result, err)
+		}
 	}))
 
 	mux.Handle("POST /nxproxy/v1/status", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
@@ -64,12 +89,13 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 			return
 		}
 
-		if err = proc.HandleStatus(req.Context(), requestToken(req), status); err != nil {
-			writeResponse[any](wrt, nil, err)
-			return
+		if token := authorize(wrt, req); token != nil {
+			if err = proc.HandleStatus(req.Context(), token, status); err != nil {
+				writeResponse[any](wrt, nil, err)
+				return
+			}
+			wrt.WriteHeader(http.StatusNoContent)
 		}
-
-		wrt.WriteHeader(http.StatusNoContent)
 	}))
 
 	mux.Handle("GET /nxproxy/v1/ping", http.HandlerFunc(func(wrt http.ResponseWriter, _ *http.Request) {
@@ -79,14 +105,13 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 	return mux
 }
 
-func requestToken(req *http.Request) *nxproxy.ServerToken {
+func requestToken(req *http.Request) (*nxproxy.ServerToken, error) {
 
 	if schema, bearer, _ := strings.Cut(req.Header.Get("Authorization"), " "); strings.ToLower(schema) == "bearer" {
-		token, _ := nxproxy.ParseServerToken(bearer)
-		return token
+		return nxproxy.ParseServerToken(bearer)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func requestBody[T any](req *http.Request) (*T, error) {
