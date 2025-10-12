@@ -179,39 +179,54 @@ func (hub *ServiceHub) SetServices(entries []nxproxy.ServiceOptions) {
 	}
 
 	//	remove slot entries that weren't updated
-	for key, service := range hub.bindMap {
+	for key, svc := range hub.bindMap {
 
-		info := service.Info()
+		info := svc.Info()
+		err := svc.Close()
 
-		if err := service.Close(); err != nil {
+		if newSvc, has := newBindMap[key]; has {
 
-			if newSlot, has := newBindMap[key]; has {
+			newInfo := newSvc.Info()
 
-				newInfo := newSlot.Info()
+			if err != nil {
 
 				slog.Error("Slot failed to terminate; Unable to overwrite a newer slot entry",
-					slog.String("old_id", info.ID.String()),
-					slog.String("new_id", newInfo.ID.String()),
+					slog.String("id", info.ID.String()),
 					slog.String("type", string(info.Proto)),
 					slog.String("addr", info.BindAddr),
 					slog.String("err", err.Error()))
-				slog.Warn("Possible service binding conflict")
 
-			} else {
-				slog.Error("Slot failed to terminate; Keeping and retrying again",
-					slog.String("id", info.ID.String()),
-					slog.String("err", err.Error()))
-				newBindMap[key] = service
+				slog.Warn("Possible service binding conflict",
+					slog.String("conflicting_id", newInfo.ID.String()),
+					slog.String("addr", info.BindAddr))
+
+				continue
 			}
 
-		} else {
-			slog.Info("Remove slot",
+			slog.Info("Replace slot",
 				slog.String("id", info.ID.String()),
 				slog.String("type", string(info.Proto)),
-				slog.String("addr", info.BindAddr))
+				slog.String("addr", info.BindAddr),
+				slog.String("new_id", newInfo.ID.String()),
+				slog.String("new_type", string(newInfo.Proto)))
+
+			continue
 		}
 
-		hub.oldDeltas = append(hub.oldDeltas, service.Deltas()...)
+		if err != nil {
+			slog.Error("Slot failed to terminate; Keeping and retrying again",
+				slog.String("id", info.ID.String()),
+				slog.String("err", err.Error()))
+			newBindMap[key] = svc
+			continue
+		}
+
+		slog.Info("Remove slot",
+			slog.String("id", info.ID.String()),
+			slog.String("type", string(info.Proto)),
+			slog.String("addr", info.BindAddr))
+
+		hub.oldDeltas = append(hub.oldDeltas, svc.Deltas()...)
 
 		delete(hub.bindMap, key)
 	}
