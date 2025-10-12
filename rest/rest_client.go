@@ -20,3 +20,7 @@ func (client *Client) PostStatus(status *model.Status) error {
 func (client *Client) PullConfig() (*model.FullConfig, error) {
 	return fetch[model.FullConfig](client.URL, client.Token, http.MethodGet, "/nxproxy/v1/config", nil)
 }
+
+func (client *Client) Ping() error {
+	return beacon(client.URL, client.Token, http.MethodGet, "/nxproxy/v1/ping", nil)
+}

@@ -69,6 +69,14 @@ func main() {
 		slog.Warn("Secret token not provided")
 	}
 
+	if val, _ := GetConfigOpt(cfgEntries, "SKIP_STARTUP_PING"); strings.ToLower(val) != "true" {
+		if err := client.Ping(); err != nil {
+			slog.Error("Auth server didn't respond to the ping",
+				slog.String("err", err.Error()))
+			os.Exit(1)
+		}
+	}
+
 	var hub ServiceHub
 	var wg sync.WaitGroup
 
