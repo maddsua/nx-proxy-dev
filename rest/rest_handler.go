@@ -34,29 +34,6 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 		})
 	}
 
-	var authorize = func(wrt http.ResponseWriter, req *http.Request) *nxproxy.ServerToken {
-
-		token, err := requestToken(req)
-		if err != nil {
-
-			writeResponse[any](wrt, nil, &APIError{
-				Message: fmt.Sprintf("invalid token: %v", err),
-				Status:  http.StatusBadRequest,
-			})
-			return nil
-
-		} else if token == nil {
-
-			writeResponse[any](wrt, nil, &APIError{
-				Message: "unauthorized",
-				Status:  http.StatusUnauthorized,
-			})
-			return nil
-		}
-
-		return token
-	}
-
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /nxproxy/v1/config", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
@@ -68,7 +45,7 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 
 		defer panicHandler(wrt)
 
-		if token := authorize(wrt, req); token != nil {
+		if token := handleRequestAuth(wrt, req); token != nil {
 			result, err := proc.HandleFullConfig(req.Context(), token)
 			writeResponse(wrt, result, err)
 		}
@@ -83,18 +60,14 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 
 		defer panicHandler(wrt)
 
-		status, err := requestBody[model.Status](req)
-		if err != nil {
-			writeResponse[any](wrt, nil, err)
-			return
-		}
-
-		if token := authorize(wrt, req); token != nil {
-			if err = proc.HandleStatus(req.Context(), token, status); err != nil {
-				writeResponse[any](wrt, nil, err)
-				return
+		if status := handleRequestBody[model.Status](wrt, req); status != nil {
+			if token := handleRequestAuth(wrt, req); token != nil {
+				if err := proc.HandleStatus(req.Context(), token, status); err != nil {
+					writeResponse[any](wrt, nil, err)
+					return
+				}
+				wrt.WriteHeader(http.StatusNoContent)
 			}
-			wrt.WriteHeader(http.StatusNoContent)
 		}
 	}))
 
@@ -105,32 +78,59 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 	return mux
 }
 
-func requestToken(req *http.Request) (*nxproxy.ServerToken, error) {
-
-	if schema, bearer, _ := strings.Cut(req.Header.Get("Authorization"), " "); strings.ToLower(schema) == "bearer" {
-		return nxproxy.ParseServerToken(bearer)
-	}
-
-	return nil, nil
-}
-
-func requestBody[T any](req *http.Request) (*T, error) {
+func handleRequestBody[T any](wrt http.ResponseWriter, req *http.Request) *T {
 
 	if !strings.Contains(strings.ToLower(req.Header.Get("Content-Type")), "json") {
-		return nil, &APIError{
+
+		writeResponse[any](wrt, nil, &APIError{
 			Message: "wrong request content type",
 			Status:  http.StatusBadRequest,
-		}
+		})
+
+		return nil
 	}
 
 	var body T
 
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
-		return nil, &APIError{
+
+		writeResponse[any](wrt, nil, &APIError{
 			Message: fmt.Sprintf("decoder: %v", err),
 			Status:  http.StatusBadRequest,
-		}
+		})
+
+		return nil
 	}
 
-	return &body, nil
+	return &body
+}
+
+func handleRequestAuth(wrt http.ResponseWriter, req *http.Request) *nxproxy.ServerToken {
+
+	var unwrapToken = func() (*nxproxy.ServerToken, error) {
+		if schema, bearer, _ := strings.Cut(req.Header.Get("Authorization"), " "); strings.ToLower(schema) == "bearer" {
+			return nxproxy.ParseServerToken(bearer)
+		}
+		return nil, nil
+	}
+
+	token, err := unwrapToken()
+	if err != nil {
+
+		writeResponse[any](wrt, nil, &APIError{
+			Message: fmt.Sprintf("invalid token: %v", err),
+			Status:  http.StatusBadRequest,
+		})
+		return nil
+
+	} else if token == nil {
+
+		writeResponse[any](wrt, nil, &APIError{
+			Message: "unauthorized",
+			Status:  http.StatusUnauthorized,
+		})
+		return nil
+	}
+
+	return token
 }
