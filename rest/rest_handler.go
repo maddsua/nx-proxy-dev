@@ -72,6 +72,10 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 		wrt.WriteHeader(http.StatusNoContent)
 	}))
 
+	mux.Handle("GET /nxproxy/v1/ping", http.HandlerFunc(func(wrt http.ResponseWriter, _ *http.Request) {
+		wrt.WriteHeader(http.StatusNoContent)
+	}))
+
 	return mux
 }
 

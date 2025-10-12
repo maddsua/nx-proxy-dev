@@ -97,6 +97,15 @@ paths:
                 properties:
                   error:
                     $ref: '#/components/schemas/APIError'
+  /ping:
+    get:
+      tags:
+        - status
+      summary: Returns an empty No-Content response
+      description: Used for testing and debugging to make sure that your generated url/handler is correct
+      responses:
+        204:
+          description: Successful operation
 components:
   schemas:
     APIError:
