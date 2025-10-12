@@ -102,7 +102,7 @@ func main() {
 		slog.Debug("API: Config updated")
 	}
 
-	deltasQueue := make([]nxproxy.SlotDelta, 0)
+	deltasQueue := make([]nxproxy.PeerDelta, 0)
 
 	var doStatusPush = func() {
 
@@ -124,7 +124,7 @@ func main() {
 			return
 		}
 
-		deltasQueue = make([]nxproxy.SlotDelta, 0)
+		deltasQueue = make([]nxproxy.PeerDelta, 0)
 
 		slog.Debug("API: Metrics sent",
 			slog.String("remote", client.URL.Host),

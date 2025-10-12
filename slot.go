@@ -19,7 +19,7 @@ var ErrUnsupportedProto = errors.New("unsupported protocol")
 
 type SlotService interface {
 	Info() SlotInfo
-	Deltas() []SlotDelta
+	Deltas() []PeerDelta
 	SetPeers(entries []PeerOptions)
 	SetOptions(opts SlotOptions) error
 	Close() error
@@ -42,7 +42,6 @@ type ServiceOptions struct {
 }
 
 type SlotOptions struct {
-	ID       uuid.UUID  `json:"id"`
 	Proto    ProxyProto `json:"proto"`
 	BindAddr string     `json:"bind_addr"`
 }
@@ -53,18 +52,11 @@ func (opts *SlotOptions) Compatible(other *SlotOptions) bool {
 		return false
 	}
 
-	return opts.ID == other.ID &&
-		opts.Proto == other.Proto &&
+	return opts.Proto == other.Proto &&
 		opts.BindAddr == other.BindAddr
 }
 
-type SlotDelta struct {
-	SlotID uuid.UUID `json:"slot"`
-	PeerDelta
-}
-
 type SlotInfo struct {
-	ID              uuid.UUID  `json:"id"`
 	Up              bool       `json:"up"`
 	Proto           ProxyProto `json:"proto"`
 	BindAddr        string     `json:"bind_addr"`
@@ -88,7 +80,6 @@ type Slot struct {
 
 func (slot *Slot) Info() SlotInfo {
 	return SlotInfo{
-		ID:              slot.ID,
 		Up:              true,
 		Proto:           slot.Proto,
 		BindAddr:        slot.BindAddr,
@@ -96,7 +87,7 @@ func (slot *Slot) Info() SlotInfo {
 	}
 }
 
-func (slot *Slot) Deltas() []SlotDelta {
+func (slot *Slot) Deltas() []PeerDelta {
 
 	slot.mtx.Lock()
 	defer slot.mtx.Unlock()
@@ -114,22 +105,19 @@ func (slot *Slot) Deltas() []SlotDelta {
 
 	for _, delta := range deltaList {
 
-		entry := peerMap[delta.PeerID]
+		entry := peerMap[delta.ID]
 		if entry == nil {
 			entry = &delta
-			peerMap[delta.PeerID] = entry
+			peerMap[delta.ID] = entry
 		} else {
 			entry.Rx += delta.Rx
 			entry.Tx += delta.Tx
 		}
 	}
 
-	var entries []SlotDelta
+	var entries []PeerDelta
 	for _, val := range peerMap {
-		entries = append(entries, SlotDelta{
-			SlotID:    slot.ID,
-			PeerDelta: *val,
-		})
+		entries = append(entries, *val)
 	}
 
 	return entries
@@ -181,7 +169,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 		if err := peerOptsValid(&entry); err != nil {
 			slog.Warn("Update peers: Peer option invalid; Skipped",
-				slog.String("slot_id", slot.ID.String()),
 				slog.String("peer_id", entry.ID.String()),
 				slog.String("name", entry.DisplayName()),
 				slog.String("err", err.Error()))
@@ -191,7 +178,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		framedIP, err := ParseFramedIP(entry.FramedIP)
 		if err != nil {
 			slog.Warn("Update peers: Framed IP unavailable",
-				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", entry.ID.String()),
 				slog.String("addr", entry.FramedIP),
 				slog.String("name", entry.DisplayName()),
@@ -201,7 +187,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		if peer, ok := slot.peerMap[entry.ID]; ok {
 
 			slog.Debug("Update peer",
-				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
 
@@ -222,12 +207,10 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			if disabledFlagChanged {
 				if peer.Disabled {
 					slog.Info("Peer disabled",
-						slog.String("slot_id", slot.ID.String()),
 						slog.String("id", peer.ID.String()),
 						slog.String("name", peer.DisplayName()))
 				} else {
 					slog.Info("Peer enabled",
-						slog.String("slot_id", slot.ID.String()),
 						slog.String("id", peer.ID.String()),
 						slog.String("name", peer.DisplayName()))
 				}
@@ -237,7 +220,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			if mustReauth {
 
 				slog.Info("Peer credentials changed; Must reauthenticate",
-					slog.String("slot_id", slot.ID.String()),
 					slog.String("id", peer.ID.String()),
 					slog.String("name", peer.DisplayName()))
 
@@ -264,7 +246,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		}
 
 		slog.Info("Create peer",
-			slog.String("slot_id", slot.ID.String()),
 			slog.String("id", peer.ID.String()),
 			slog.String("name", peer.DisplayName()))
 
@@ -276,7 +257,6 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		if _, has := newPeerMap[key]; !has {
 
 			slog.Info("Remove peer",
-				slog.String("slot_id", slot.ID.String()),
 				slog.String("id", peer.ID.String()),
 				slog.String("name", peer.DisplayName()))
 

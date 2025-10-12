@@ -12,7 +12,7 @@ type FullConfig struct {
 
 type Status struct {
 	Service ServiceInfo         `json:"service"`
-	Deltas  []nxproxy.SlotDelta `json:"deltas"`
+	Deltas  []nxproxy.PeerDelta `json:"deltas"`
 	Slots   []nxproxy.SlotInfo
 }
 

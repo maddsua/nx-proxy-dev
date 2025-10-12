@@ -3,9 +3,8 @@
 listen_addr: ":2500"
 proxy:
   services:
-    - id: 5460e1ab-0383-4740-95b8-2ddffc35c41d
+    - bind_addr: 127.0.0.1:1080
       proto: socks
-      bind_addr: 127.0.0.1:1080
       peers:
         - id: 29f657a5-f065-4963-831f-70b0f22bd9f2
           username: maddsua
@@ -13,9 +12,8 @@ proxy:
           max_connections: 64
           rx_rate: 50000
           tx_rate: 50000
-    - id: b0ae638b-5272-4d04-bea9-2e7a58d7031c
+    - bind_addr: 127.0.0.1:8080
       proto: http
-      bind_addr: 127.0.0.1:8080
       peers:
         - id: 884ed5ac-e617-4b43-aa38-03b433ebd7b2
           username: maddsua

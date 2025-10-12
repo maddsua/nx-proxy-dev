@@ -20,9 +20,8 @@ type ProxyConfig struct {
 }
 
 type ServiceConfig struct {
-	ID       uuid.UUID    `yaml:"id"`
-	Proto    string       `yaml:"proto"`
 	BindAddr string       `yaml:"bind_addr"`
+	Proto    string       `yaml:"proto"`
 	Peers    []PeerConfig `yaml:"peers"`
 }
 

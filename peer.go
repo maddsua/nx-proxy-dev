@@ -55,7 +55,7 @@ type PeerBandwidth struct {
 type PeerDelta struct {
 
 	//	unique peer ID
-	PeerID uuid.UUID `json:"peer"`
+	ID uuid.UUID `json:"id"`
 
 	//	data transferred
 	Rx uint64 `json:"rx"`
@@ -279,7 +279,7 @@ func (peer *Peer) Delta() (PeerDelta, bool) {
 
 	if rx > 0 || tx > 0 {
 		return PeerDelta{
-			PeerID: peer.ID,
+			ID: peer.ID,
 
 			Rx: rx,
 			Tx: tx,

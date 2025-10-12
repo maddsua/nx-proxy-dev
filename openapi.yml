@@ -129,20 +129,16 @@ components:
     ServiceOptions:
       type: object
       properties:
-        id:
+        bind_addr:
           type: string
-          description: Unique slot UUID
-          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
+          description: Slot service bind address
+          example: 127.0.0.1:1080
         proto:
           type: string
           description: Slot service type
           enum:
             - socks
             - http
-        bind_addr:
-          type: string
-          description: Slot service bind address
-          example: 127.0.0.1:1080
         peers:
           type: array
           description: List of active slot peers
@@ -223,7 +219,7 @@ components:
           type: array
           description: Data volume statistics
           items:
-            $ref: '#/components/schemas/SlotDelta'
+            $ref: '#/components/schemas/PeerDelta'
         slots:
           type: array
           description: Active slot info
@@ -240,14 +236,10 @@ components:
           type: integer
           description: Service uptime in seconds
           example: 69
-    SlotDelta:
+    PeerDelta:
       type: object
       properties:
-        slot:
-          type: string
-          description: Delta's slot UUID
-          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
-        peer:
+        id:
           type: string
           description: Delta's peer UUID
           example: 9bad1601-7463-493d-986e-3f049e4043a4
@@ -262,10 +254,6 @@ components:
     SlotInfo:
       type: object
       properties:
-        id:
-          type: string
-          description: Unique slot UUID
-          example: 7c8abe0b-f89e-4394-9340-c12b2409fea8
         up:
           type: boolean
           description: A flag indicating whether the service is active
