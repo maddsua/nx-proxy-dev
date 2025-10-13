@@ -69,12 +69,26 @@ func main() {
 		slog.Warn("Secret token not provided")
 	}
 
+	slog.Info("Connecting to auth backend",
+		slog.String("url", client.URL.String()),
+		slog.String("node_id", client.Token.ID.String()))
+
+	if client.URL.Scheme != "https" && client.URL.Hostname() != "localhost" {
+		slog.Warn("Auth backend connection insecure. Make sure to use https instead")
+	}
+
 	if val, _ := GetConfigOpt(cfgEntries, "SKIP_STARTUP_PING"); strings.ToLower(val) != "true" {
+
 		if err := client.Ping(); err != nil {
-			slog.Error("Auth server didn't respond to the ping",
+			slog.Error("Auth backend ping failed",
 				slog.String("err", err.Error()))
 			os.Exit(1)
 		}
+
+		slog.Info("Auth backend OK")
+
+	} else {
+		slog.Warn("Skipped auth backend check")
 	}
 
 	var hub ServiceHub
@@ -89,13 +103,11 @@ func main() {
 		cfg, err := client.PullConfig()
 		if err != nil {
 			slog.Error("API: Pulling config",
-				slog.String("err", err.Error()),
-				slog.String("remote", client.URL.Host))
+				slog.String("err", err.Error()))
 			return
 		}
 
-		slog.Debug("API: Updating config",
-			slog.String("remote", client.URL.Host))
+		slog.Debug("API: Updating config")
 
 		hub.SetConfig(cfg)
 
@@ -127,7 +139,6 @@ func main() {
 		deltasQueue = make([]nxproxy.PeerDelta, 0)
 
 		slog.Debug("API: Metrics sent",
-			slog.String("remote", client.URL.Host),
 			slog.Int("deltas", len(metrics.Deltas)))
 	}
 
