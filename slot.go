@@ -131,11 +131,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	importedPeerIdSet := map[uuid.UUID]struct{}{}
 	importedUsernameSet := map[string]struct{}{}
 
-	var peerOptsValid = func(peer *PeerOptions) error {
-
-		if peer.ID == uuid.Nil {
-			return fmt.Errorf("id is null")
-		}
+	//	checks whether we can reliably identify and map a peer by it's uuid and/or credentials
+	var peerMappable = func(peer *PeerOptions) error {
 
 		if _, has := importedPeerIdSet[peer.ID]; has {
 			return fmt.Errorf("id not unique: %v", peer.ID)
@@ -167,7 +164,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 	//	update peers
 	for _, entry := range entries {
 
-		if err := peerOptsValid(&entry); err != nil {
+		if err := peerMappable(&entry); err != nil {
 			slog.Warn("Update peers: Peer option invalid; Skipped",
 				slog.String("peer_id", entry.ID.String()),
 				slog.String("name", entry.DisplayName()),
