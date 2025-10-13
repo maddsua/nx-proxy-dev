@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -159,6 +160,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 		}
 	}
 
+	slotHandle := strings.Join([]string{string(slot.Proto), slot.BindAddr}, "@")
+
 	newPeerMap := map[uuid.UUID]*Peer{}
 
 	//	update peers
@@ -168,6 +171,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 			slog.Warn("Update peers: Peer option invalid; Skipped",
 				slog.String("peer_id", entry.ID.String()),
 				slog.String("name", entry.DisplayName()),
+				slog.String("slot", slotHandle),
 				slog.String("err", err.Error()))
 			continue
 		}
@@ -178,6 +182,7 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				slog.String("id", entry.ID.String()),
 				slog.String("addr", entry.FramedIP),
 				slog.String("name", entry.DisplayName()),
+				slog.String("slot", slotHandle),
 				slog.String("err", err.Error()))
 		}
 
@@ -185,7 +190,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 			slog.Debug("Update peer",
 				slog.String("id", peer.ID.String()),
-				slog.String("name", peer.DisplayName()))
+				slog.String("name", peer.DisplayName()),
+				slog.String("slot", slotHandle))
 
 			//	check if we have state changes
 			mustReauth := !peer.PeerOptions.CmpCredentials(entry)
@@ -205,11 +211,13 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				if peer.Disabled {
 					slog.Info("Peer disabled",
 						slog.String("id", peer.ID.String()),
-						slog.String("name", peer.DisplayName()))
+						slog.String("name", peer.DisplayName()),
+						slog.String("slot", slotHandle))
 				} else {
 					slog.Info("Peer enabled",
 						slog.String("id", peer.ID.String()),
-						slog.String("name", peer.DisplayName()))
+						slog.String("name", peer.DisplayName()),
+						slog.String("slot", slotHandle))
 				}
 			}
 
@@ -218,7 +226,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 				slog.Info("Peer credentials changed; Must reauthenticate",
 					slog.String("id", peer.ID.String()),
-					slog.String("name", peer.DisplayName()))
+					slog.String("name", peer.DisplayName()),
+					slog.String("slot", slotHandle))
 
 				peer.CloseConnections()
 				storePeerDelta(peer)
@@ -244,7 +253,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 		slog.Info("Create peer",
 			slog.String("id", peer.ID.String()),
-			slog.String("name", peer.DisplayName()))
+			slog.String("name", peer.DisplayName()),
+			slog.String("slot", slotHandle))
 
 		newPeerMap[entry.ID] = &peer
 	}
@@ -255,7 +265,8 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 
 			slog.Info("Remove peer",
 				slog.String("id", peer.ID.String()),
-				slog.String("name", peer.DisplayName()))
+				slog.String("name", peer.DisplayName()),
+				slog.String("slot", slotHandle))
 
 			peer.CloseConnections()
 			storePeerDelta(peer)
