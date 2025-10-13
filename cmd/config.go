@@ -15,8 +15,6 @@ func LoadConfigFile() (ConfigEntries, string) {
 
 	entries := []string{
 		"/etc/nx-proxy/nx-proxy.conf",
-		"/opt/nx-proxy/nx-proxy.conf",
-		"~/nx-proxy/nx-proxy.conf",
 		"~/nx-proxy.conf",
 		"./nx-proxy.conf",
 	}
