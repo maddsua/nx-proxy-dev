@@ -193,26 +193,28 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				slog.String("name", peer.DisplayName()),
 				slog.String("slot", slotHandle))
 
-			//	check if we have state changes
-			mustReauth := !peer.PeerOptions.CmpCredentials(entry)
+			//	diff peer options
+			credentialsChanges := !peer.PeerOptions.CmpCredentials(entry)
+			framedIpChanged := peer.PeerOptions.FramedIP != entry.FramedIP
 			disabledFlagChanged := peer.Disabled != entry.Disabled
 
-			//	update peer props
+			//	update peer options
 			peer.PeerOptions = entry
 			peer.Dialer.LocalAddr = TcpDialAddr(framedIP)
 
-			//	drop connections if peer has to be disabled
-			if peer.Disabled {
-				peer.CloseConnections()
-				storePeerDelta(peer)
-			}
-
+			//	drop connections when peer state changes to 'disabled'
 			if disabledFlagChanged {
+
 				if peer.Disabled {
+
+					peer.CloseConnections()
+					storePeerDelta(peer)
+
 					slog.Info("Peer disabled",
 						slog.String("id", peer.ID.String()),
 						slog.String("name", peer.DisplayName()),
 						slog.String("slot", slotHandle))
+
 				} else {
 					slog.Info("Peer enabled",
 						slog.String("id", peer.ID.String()),
@@ -221,24 +223,34 @@ func (slot *Slot) SetPeers(entries []PeerOptions) {
 				}
 			}
 
-			//	also drop connections has to reauth
-			if mustReauth {
+			//	drop connections when peer auth or ip changed
+			if credentialsChanges || framedIpChanged {
 
-				slog.Info("Peer credentials changed; Must reauthenticate",
-					slog.String("id", peer.ID.String()),
-					slog.String("name", peer.DisplayName()),
-					slog.String("slot", slotHandle))
+				switch {
+				case credentialsChanges:
+					slog.Info("Peer credentials changed; Must reauthenticate",
+						slog.String("id", peer.ID.String()),
+						slog.String("name", peer.DisplayName()),
+						slog.String("slot", slotHandle))
+				case framedIpChanged:
+					slog.Info("Peer framed IP changed; Must reauthenticate",
+						slog.String("id", peer.ID.String()),
+						slog.String("name", peer.DisplayName()),
+						slog.String("slot", slotHandle))
+				}
 
 				peer.CloseConnections()
 				storePeerDelta(peer)
 			}
 
-			//	update maps
+			//	move updated peer to a fresh map
 			newPeerMap[peer.ID] = peer
 			delete(slot.peerMap, entry.ID)
 
 			continue
 		}
+
+		//	create and insert a new peer into a fresh map
 
 		peer := Peer{
 			PeerOptions: entry,
