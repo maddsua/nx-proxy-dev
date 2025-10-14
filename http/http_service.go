@@ -76,7 +76,7 @@ func (svc *service) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
 			slog.String("err", err.Error()))
 
 		wrt.Header().Set("Proxy-Authenticate", "Basic")
-		wrt.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusProxyAuthRequired)
 		return
 	}
 
@@ -96,14 +96,14 @@ func (svc *service) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
 				slog.String("client_ip", clientIP),
 				slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 				slog.String("err", err.Error()))
-			wrt.WriteHeader(http.StatusForbidden)
+			wrt.WriteHeader(http.StatusProxyAuthRequired)
 
 		default:
 			slog.Debug("HTTP: Password auth rejected",
 				slog.String("client_ip", clientIP),
 				slog.String("proxy_addr", svc.SlotOptions.BindAddr),
 				slog.String("err", err.Error()))
-			wrt.WriteHeader(http.StatusForbidden)
+			wrt.WriteHeader(http.StatusProxyAuthRequired)
 		}
 
 		return
