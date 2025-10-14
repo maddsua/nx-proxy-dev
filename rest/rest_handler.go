@@ -18,32 +18,13 @@ type ProcedureHandler struct {
 
 func NewHandler(proc ProcedureHandler) http.Handler {
 
-	var panicHandler = func(wrt http.ResponseWriter) {
-		if rec := recover(); rec != nil {
-			writeResponse[any](wrt, nil, &APIError{
-				Message: fmt.Sprintf("handler panicked: %v", rec),
-				Status:  http.StatusInternalServerError,
-			})
-		}
-	}
-
-	var handlerNotImplemented = func(wrt http.ResponseWriter) {
-		writeResponse[any](wrt, nil, &APIError{
-			Message: "procedure not implemented",
-			Status:  http.StatusNotImplemented,
-		})
-	}
-
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /nxproxy/v1/config", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
 
 		if proc.HandleFullConfig == nil {
-			handlerNotImplemented(wrt)
-			return
+			panic(fmt.Errorf("nx-proxy.ProcedureHandler.HandleFullConfig not implemented"))
 		}
-
-		defer panicHandler(wrt)
 
 		if token := handleRequestAuth(wrt, req); token != nil {
 			result, err := proc.HandleFullConfig(req.Context(), token)
@@ -54,11 +35,8 @@ func NewHandler(proc ProcedureHandler) http.Handler {
 	mux.Handle("POST /nxproxy/v1/status", http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
 
 		if proc.HandleStatus == nil {
-			handlerNotImplemented(wrt)
-			return
+			panic(fmt.Errorf("nx-proxy.ProcedureHandler.HandleStatus not implemented"))
 		}
-
-		defer panicHandler(wrt)
 
 		if status := handleRequestBody[model.Status](wrt, req); status != nil {
 			if token := handleRequestAuth(wrt, req); token != nil {
